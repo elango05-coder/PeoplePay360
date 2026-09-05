@@ -191,10 +191,10 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
             onChange={(e) => setFormData({ ...formData, leaveType: e.target.value as LeaveType })}
             options={[
               { value: 'Casual', label: 'Casual Leave' },
-              { value: 'Annual', label: 'Annual Leave' },
+              ...(!isEmployeeRole ? [{ value: 'Annual', label: 'Annual Leave' }] : []),
               { value: 'Sick', label: 'Sick Leave' },
               { value: 'Maternity/Paternity', label: 'Maternity / Paternity Leave' },
-              { value: 'Unpaid', label: 'Unpaid Leave (LWP)' }
+              ...(!isEmployeeRole ? [{ value: 'Unpaid', label: 'Unpaid Leave (LWP)' }] : [])
             ]}
             required
           />

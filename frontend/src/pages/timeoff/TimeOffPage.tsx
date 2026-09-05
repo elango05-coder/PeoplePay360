@@ -101,6 +101,40 @@ export const TimeOffPage: React.FC = () => {
     });
   }, [requests, searchQuery, selectedStatus, selectedType]);
 
+  const visibleBalances = useMemo(() => {
+    return balances.filter((bal) => {
+      if (role === 'employee') {
+        return bal.leaveType !== 'Unpaid' && bal.leaveType !== 'Annual';
+      }
+      return bal.leaveType !== 'Unpaid';
+    });
+  }, [balances, role]);
+
+  const leaveTypeOptions = useMemo(() => {
+    if (role === 'employee') {
+      return [
+        { value: 'All', label: 'All Leave Types' },
+        { value: 'Casual', label: 'Casual' },
+        { value: 'Sick', label: 'Sick' },
+        { value: 'Maternity/Paternity', label: 'Maternity/Paternity' },
+      ];
+    }
+    return [
+      { value: 'All', label: 'All Leave Types' },
+      { value: 'Annual', label: 'Annual' },
+      { value: 'Casual', label: 'Casual' },
+      { value: 'Sick', label: 'Sick' },
+      { value: 'Maternity/Paternity', label: 'Maternity/Paternity' },
+      { value: 'Unpaid', label: 'Unpaid' },
+    ];
+  }, [role]);
+
+  useEffect(() => {
+    if (role === 'employee' && (selectedType === 'Annual' || selectedType === 'Unpaid')) {
+      setSelectedType('All');
+    }
+  }, [role, selectedType]);
+
   const totalPages = Math.ceil(filteredRequests.length / pageSize);
   const paginatedRequests = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -130,7 +164,7 @@ export const TimeOffPage: React.FC = () => {
 
       {/* Leave Balance Meters Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {balances.map((bal) => {
+        {visibleBalances.map((bal) => {
           const pct = Math.round((bal.remaining / (bal.allocated || 1)) * 100);
 
           return (
@@ -229,13 +263,7 @@ export const TimeOffPage: React.FC = () => {
                 placeholder="Status"
               />
               <FilterBar
-                options={[
-                  { value: 'All', label: 'All Leave Types' },
-                  { value: 'Annual', label: 'Annual' },
-                  { value: 'Casual', label: 'Casual' },
-                  { value: 'Sick', label: 'Sick' },
-                  { value: 'Unpaid', label: 'Unpaid' },
-                ]}
+                options={leaveTypeOptions}
                 value={selectedType}
                 onChange={setSelectedType}
                 placeholder="Type"
@@ -373,7 +401,7 @@ export const TimeOffPage: React.FC = () => {
               </Tr>
             </Thead>
             <Tbody>
-              {balances.map((b) => (
+              {visibleBalances.map((b) => (
                 <Tr key={b.leaveType}>
                   <Td className="text-xs font-bold text-slate-900">{b.leaveType} Leave</Td>
                   <Td className="text-xs font-mono font-semibold">{b.allocated} Days</Td>
@@ -390,13 +418,15 @@ export const TimeOffPage: React.FC = () => {
       {/* Tab 3: Time Off Types */}
       {activeTab === 'types' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
-            <h4 className="text-xs font-bold text-slate-900 font-heading">Annual Vacation Leave</h4>
-            <p className="text-xs text-slate-500 mt-1">Paid statutory leave allocated yearly. Requires 3-day advance notice.</p>
-            <span className="inline-block mt-3 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-              Paid Entitlement
-            </span>
-          </div>
+          {role !== 'employee' && (
+            <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
+              <h4 className="text-xs font-bold text-slate-900 font-heading">Annual Vacation Leave</h4>
+              <p className="text-xs text-slate-500 mt-1">Paid statutory leave allocated yearly. Requires 3-day advance notice.</p>
+              <span className="inline-block mt-3 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                Paid Entitlement
+              </span>
+            </div>
+          )}
           <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
             <h4 className="text-xs font-bold text-slate-900 font-heading">Casual & Emergency Leave</h4>
             <p className="text-xs text-slate-500 mt-1">Short-term emergency absences with immediate manager authorization.</p>
@@ -405,12 +435,21 @@ export const TimeOffPage: React.FC = () => {
             </span>
           </div>
           <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
-            <h4 className="text-xs font-bold text-slate-900 font-heading">Unpaid Leave (LWP)</h4>
-            <p className="text-xs text-slate-500 mt-1">Absences beyond allocated quotas. Triggers automated daily salary deduction during payroll computation.</p>
-            <span className="inline-block mt-3 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
-              Payroll Deduction
+            <h4 className="text-xs font-bold text-slate-900 font-heading">Sick & Medical Leave</h4>
+            <p className="text-xs text-slate-500 mt-1">Paid leave for health recovery and medical appointments.</p>
+            <span className="inline-block mt-3 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+              Paid Entitlement
             </span>
           </div>
+          {role !== 'employee' && (
+            <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
+              <h4 className="text-xs font-bold text-slate-900 font-heading">Unpaid Leave (LWP)</h4>
+              <p className="text-xs text-slate-500 mt-1">Absences beyond allocated quotas. Triggers automated daily salary deduction during payroll computation.</p>
+              <span className="inline-block mt-3 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                Payroll Deduction
+              </span>
+            </div>
+          )}
         </div>
       )}
 
