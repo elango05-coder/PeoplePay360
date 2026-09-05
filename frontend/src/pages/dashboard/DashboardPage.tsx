@@ -13,11 +13,14 @@ import {
   CalendarCheck, 
   BadgeAlert,
   Building2,
-  TrendingUp
+  TrendingUp,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { employeeService } from '../../services/employeeService';
-import { attendanceService } from '../../services/attendanceService';
+import { attendanceService, getLocalDateString, formatTime } from '../../services/attendanceService';
 import { timeOffService } from '../../services/timeOffService';
 import { payrollService } from '../../services/payrollService';
 import { contractService } from '../../services/contractService';
@@ -32,6 +35,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
   const { user, role, canAccess } = useAuth();
+  const { success, error } = useToast();
   const navigate = useNavigate();
   const effectiveRole = forcedRole || role;
 
@@ -40,6 +44,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
   const [leaveRequests, setLeaveRequests] = useState<TimeOffRequest[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const [isPunching, setIsPunching] = useState(false);
   const [attendanceStats, setAttendanceStats] = useState({
     total: 0,
     present: 0,
@@ -55,12 +61,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
       try {
         if (effectiveRole === 'employee') {
           const empId = user?.employeeId;
-          const [leaves, attRecords] = await Promise.all([
+          const todayStr = getLocalDateString();
+          const [leaves, attRecords, todayAtt] = await Promise.all([
             timeOffService.getTimeOffRequests(empId ? { employeeId: empId } : undefined),
-            attendanceService.getAttendanceRecords(empId ? { employeeId: empId } : undefined)
+            attendanceService.getAttendanceRecords(empId ? { employeeId: empId } : undefined),
+            empId ? attendanceService.getTodayAttendance(empId, todayStr) : Promise.resolve(null)
           ]);
           setLeaveRequests(leaves);
           setAttendanceRecords(attRecords);
+          setTodayRecord(todayAtt);
         } else {
           const [empList, prList, leaves, attMetrics, cntList, attRecords] = await Promise.all([
             employeeService.getEmployees(),
@@ -86,6 +95,44 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
     loadDashboardData();
   }, [effectiveRole, user]);
 
+  const handleDashboardCheckIn = async () => {
+    if (!user?.employeeId) {
+      error('Employee session profile not found.');
+      return;
+    }
+    try {
+      setIsPunching(true);
+      const rec = await attendanceService.checkIn(user.employeeId, user.name, user.department);
+      setTodayRecord(rec);
+      success(`Checked in successfully at ${formatTime(rec.checkIn)}`);
+      const updated = await attendanceService.getAttendanceRecords({ employeeId: user.employeeId });
+      setAttendanceRecords(updated);
+    } catch (err: any) {
+      error(err?.message || 'Check-in failed');
+    } finally {
+      setIsPunching(false);
+    }
+  };
+
+  const handleDashboardCheckOut = async () => {
+    if (!user?.employeeId) {
+      error('Employee session profile not found.');
+      return;
+    }
+    try {
+      setIsPunching(true);
+      const rec = await attendanceService.checkOut(user.employeeId);
+      setTodayRecord(rec);
+      success(`Checked out successfully at ${formatTime(rec.checkOut)} (${rec.workedHours}h)`);
+      const updated = await attendanceService.getAttendanceRecords({ employeeId: user.employeeId });
+      setAttendanceRecords(updated);
+    } catch (err: any) {
+      error(err?.message || 'Check-out failed');
+    } finally {
+      setIsPunching(false);
+    }
+  };
+
   const activeEmployees = employees.filter((e) => e.status === 'Active').length;
   const pendingLeaves = leaveRequests.filter((l) => l.status === 'Pending');
   const currentPayrun = payruns[0] || null;
@@ -103,6 +150,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
   // Dedicated Employee Self-Service Dashboard
   if (effectiveRole === 'employee') {
     const myLeaves = leaveRequests.filter((l) => !user?.employeeId || l.employeeId === user.employeeId);
+    const hasCheckedIn = Boolean(todayRecord?.checkIn);
+    const hasCheckedOut = Boolean(todayRecord?.checkOut);
 
     return (
       <div className="space-y-6">
@@ -120,19 +169,42 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
             </p>
           </div>
           <div className="flex items-center gap-2.5">
+            {!hasCheckedIn ? (
+              <Button
+                variant="accent"
+                size="sm"
+                onClick={handleDashboardCheckIn}
+                isLoading={isPunching}
+                leftIcon={<LogIn className="w-3.5 h-3.5" />}
+              >
+                Check In Shift
+              </Button>
+            ) : !hasCheckedOut ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDashboardCheckOut}
+                isLoading={isPunching}
+                className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                leftIcon={<LogOut className="w-3.5 h-3.5 text-amber-600" />}
+              >
+                Check Out Shift
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/attendance')}
+                leftIcon={<Clock className="w-3.5 h-3.5 text-emerald-600" />}
+              >
+                View Attendance
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/attendance')}
-              leftIcon={<Clock className="w-3.5 h-3.5 text-emerald-600" />}
-            >
-              Punch Attendance
-            </Button>
-            <Button
-              variant="accent"
-              size="sm"
               onClick={() => navigate('/time-off')}
-              leftIcon={<Calendar className="w-3.5 h-3.5 text-white" />}
+              leftIcon={<Calendar className="w-3.5 h-3.5 text-slate-600" />}
             >
               Apply for Leave
             </Button>
@@ -147,10 +219,34 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
                 Shift Status Today
               </span>
               <div className="flex items-center justify-between mt-2">
-                <div className="text-lg font-bold text-slate-900">Normal Shift</div>
-                <Badge variant="success" size="sm">Present</Badge>
+                <div className="text-lg font-bold text-slate-900">
+                  {!hasCheckedIn ? 'Not Checked In' : !hasCheckedOut ? 'Clocked In' : 'Shift Completed'}
+                </div>
+                {!hasCheckedIn ? (
+                  <Badge variant="warning" size="sm">Pending</Badge>
+                ) : !hasCheckedOut ? (
+                  <Badge variant="success" size="sm">Active</Badge>
+                ) : (
+                  <Badge variant="violet" size="sm">Done</Badge>
+                )}
               </div>
-              <p className="text-xs text-slate-600 mt-1">09:00 AM check-in &bull; 8.0h expected</p>
+              <p className="text-xs text-slate-600 mt-1">
+                {!hasCheckedIn && 'No punch recorded yet today • 8.0h expected'}
+                {hasCheckedIn && !hasCheckedOut && `Clocked in at ${formatTime(todayRecord?.checkIn)} • In Progress`}
+                {hasCheckedOut && `${formatTime(todayRecord?.checkIn)} - ${formatTime(todayRecord?.checkOut)} • ${todayRecord?.workedHours || 8}h worked`}
+              </p>
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  {!hasCheckedIn ? 'Session waiting' : !hasCheckedOut ? 'Currently active' : 'Saved to database'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/attendance')}
+                  className="text-xs font-semibold text-violet-700 hover:text-violet-800 flex items-center gap-0.5"
+                >
+                  Details <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
             </CardContent>
           </Card>
 
