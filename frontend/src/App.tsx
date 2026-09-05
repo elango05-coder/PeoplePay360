@@ -17,6 +17,8 @@ import { SalaryStructurePage } from './pages/salary/SalaryStructurePage';
 import { PayrollDashboardPage } from './pages/payroll/PayrollDashboardPage';
 import { PayslipListPage } from './pages/payroll/PayslipListPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
+import { SchedulesPage } from './pages/schedules/SchedulesPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { UnauthorizedPage } from './pages/unauthorized/UnauthorizedPage';
 
 export function App() {
@@ -55,6 +57,16 @@ export function App() {
               />
               <Route path="contracts/:id" element={<Navigate to="/contracts" replace />} />
 
+              {/* Working Schedules Module */}
+              <Route
+                path="schedules"
+                element={
+                  <RoleGuard allowedRoles={['hr_manager', 'hr_payroll_manager', 'admin']}>
+                    <SchedulesPage />
+                  </RoleGuard>
+                }
+              />
+
               {/* Attendance Module */}
               <Route path="attendance" element={<AttendancePage />} />
 
@@ -89,6 +101,16 @@ export function App() {
                 element={
                   <RoleGuard allowedRoles={['hr_manager', 'hr_payroll_manager', 'admin']}>
                     <ReportsPage />
+                  </RoleGuard>
+                }
+              />
+
+              {/* Administration - Users */}
+              <Route
+                path="admin/users"
+                element={
+                  <RoleGuard allowedRoles={['admin']}>
+                    <AdminUsersPage />
                   </RoleGuard>
                 }
               />

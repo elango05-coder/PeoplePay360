@@ -1,16 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Calendar, 
+  Plus, 
   Check, 
   X, 
   Clock, 
-  Plus, 
+  AlertCircle, 
+  Layers, 
   CheckCircle2, 
-  AlertCircle 
+  PieChart, 
+  FileText,
+  CalendarCheck
 } from 'lucide-react';
 import { timeOffService } from '../../services/timeOffService';
-import { TimeOffRequest, LeaveBalance, LeaveStatus } from '../../types';
-import { Card, CardContent } from '../../components/ui/Card';
+import { TimeOffRequest, LeaveBalance, LeaveType, LeaveStatus } from '../../types';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, Thead, Tbody, Tr, Th, Td } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -19,72 +23,83 @@ import { FilterBar } from '../../components/common/FilterBar';
 import { Pagination } from '../../components/ui/Pagination';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { TableSkeleton } from '../../components/ui/LoadingSkeleton';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { LeaveRequestModal } from './LeaveRequestModal';
-import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export const TimeOffPage: React.FC = () => {
-  const { user, canAccess } = useAuth();
+  const { user, role, canAccess } = useAuth();
   const { success, error } = useToast();
-
-  const isEmployee = user?.role === 'employee';
 
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'requests' | 'allocations' | 'types'>('requests');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedType, setSelectedType] = useState('All');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
+  const pageSize = 8;
 
-  // Modals
-  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-  const [actionRequest, setActionRequest] = useState<{ id: string; action: 'Approved' | 'Rejected' } | null>(null);
+  // Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchTimeOffData = async () => {
     setIsLoading(true);
     try {
-      const filter = isEmployee && user?.employeeId
-        ? { employeeId: user.employeeId }
-        : undefined;
-
-      const targetBalanceEmpId = user?.employeeId || (isEmployee ? 'aaaa1111-1111-1111-1111-111111111111' : 'aaaa1111-1111-1111-1111-111111111111');
-
+      const empId = role === 'employee' ? user?.employeeId : undefined;
       const [reqList, balList] = await Promise.all([
-        timeOffService.getTimeOffRequests(filter),
-        timeOffService.getLeaveBalances(targetBalanceEmpId)
+        timeOffService.getTimeOffRequests(empId ? { employeeId: empId } : undefined),
+        timeOffService.getLeaveBalances(empId || 'emp-001')
       ]);
       setRequests(reqList);
       setBalances(balList);
-    } catch (err: any) {
-      console.error('Failed to load leave records:', err);
-      error('Failed to load leave records', err.message);
+    } catch (err) {
+      console.error(err);
+      error('Failed to load leave records');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, [user?.id, user?.role, user?.employeeId]);
+    fetchTimeOffData();
+  }, [role, user]);
+
+  const handleStatusUpdate = async (id: string, newStatus: LeaveStatus) => {
+    setActionLoadingId(id);
+    try {
+      await timeOffService.updateRequestStatus(id, newStatus, user?.name || 'HR Manager');
+      success(
+        newStatus === 'Approved' ? 'Leave Request Approved' : 'Leave Request Refused',
+        `The leave application has been marked as ${newStatus.toLowerCase()}.`
+      );
+      await fetchTimeOffData();
+    } catch (err: any) {
+      error(err.message || 'Operation failed');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
       const matchesSearch =
         searchQuery === '' ||
         r.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.leaveType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.department.toLowerCase().includes(searchQuery.toLowerCase());
+        r.reason.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus = selectedStatus === 'All' || r.status === selectedStatus;
-      return matchesSearch && matchesStatus;
+      const matchesType = selectedType === 'All' || r.leaveType === selectedType;
+
+      return matchesSearch && matchesStatus && matchesType;
     });
-  }, [requests, searchQuery, selectedStatus]);
+  }, [requests, searchQuery, selectedStatus, selectedType]);
 
   const totalPages = Math.ceil(filteredRequests.length / pageSize);
   const paginatedRequests = useMemo(() => {
@@ -92,247 +107,321 @@ export const TimeOffPage: React.FC = () => {
     return filteredRequests.slice(start, start + pageSize);
   }, [filteredRequests, currentPage, pageSize]);
 
-  const handleStatusUpdate = async () => {
-    if (!actionRequest) return;
-    try {
-      await timeOffService.updateRequestStatus(
-        actionRequest.id,
-        actionRequest.action as LeaveStatus,
-        user?.name || 'HR Manager'
-      );
-      success(`Request ${actionRequest.action}`, `The leave application has been marked as ${actionRequest.action}.`);
-      setActionRequest(null);
-      await fetchData();
-    } catch (err: any) {
-      console.error('Status Update Failed:', err);
-      error('Status Update Failed', err.message || 'Unable to update request status.');
-    }
-  };
-
-  const pendingCount = requests.filter((r) => r.status === 'Pending').length;
-  const approvedCount = requests.filter((r) => r.status === 'Approved').length;
-  const rejectedCount = requests.filter((r) => r.status === 'Rejected').length;
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            {isEmployee ? 'My Leave & Time Off' : 'Leave Management & Approval Queue'}
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            {isEmployee
-              ? 'Submit time-off requests, track approval status, and check your available leave balances.'
-              : 'Review, approve, or reject employee leave applications and monitor organization leave allowances.'}
-          </p>
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Time Off & Leave Management"
+        description="Employee leave balances, absence requests, manager approval queue, and statutory time-off allocations."
+        breadcrumbs={[
+          { label: 'Workspace', path: '/dashboard' },
+          { label: 'Time Off' }
+        ]}
+        actions={
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setIsModalOpen(true)}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Apply for Time Off
+          </Button>
+        }
+      />
 
-        <Button
-          onClick={() => setIsApplyModalOpen(true)}
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          {isEmployee ? 'Apply for Leave' : 'Record Employee Leave'}
-        </Button>
-      </div>
+      {/* Leave Balance Meters Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {balances.map((bal) => {
+          const pct = Math.round((bal.remaining / (bal.allocated || 1)) * 100);
 
-      {/* Leave Balances Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {balances.filter(b => b.leaveType !== 'Unpaid').map((bal) => (
-          <Card key={bal.leaveType} className="border-slate-200">
-            <CardContent className="p-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
-                {bal.leaveType} Leave
-              </span>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-slate-900">{bal.remaining}</span>
-                <span className="text-xs text-slate-500">days remaining</span>
+          return (
+            <div
+              key={bal.leaveType}
+              className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 font-heading">
+                    {bal.leaveType} Leave
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {bal.remaining} / {bal.allocated} Left
+                  </span>
+                </div>
+                <div className="mt-2 text-2xl font-bold text-slate-900 font-mono">
+                  {bal.remaining} <span className="text-xs font-normal text-slate-500">Days</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {bal.used} days utilized this financial year
+                </p>
               </div>
-              <div className="h-1.5 w-full bg-slate-100 rounded-full mt-2.5 overflow-hidden">
-                <div
-                  style={{ width: `${Math.min(100, (bal.used / (bal.allocated || 1)) * 100)}%` }}
-                  className="h-full bg-brand-500 rounded-full"
-                />
+
+              <div className="mt-3 pt-2 border-t border-slate-100">
+                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                    className="h-full bg-emerald-500 rounded-full"
+                  />
+                </div>
               </div>
-              <div className="flex justify-between text-[11px] text-slate-400 mt-1.5 font-medium">
-                <span>Allocated: {bal.allocated}d</span>
-                <span>Used: {bal.used}d</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Overview Status Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 block">
-              {isEmployee ? 'My Pending Requests' : 'Pending Approvals'}
-            </span>
-            <span className="text-2xl font-bold text-slate-900 mt-1 block">{pendingCount}</span>
-          </div>
-          <Clock className="w-8 h-8 text-amber-500" />
-        </div>
-
-        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 block">
-              {isEmployee ? 'Approved Leaves' : 'Total Approved'}
-            </span>
-            <span className="text-2xl font-bold text-slate-900 mt-1 block">{approvedCount}</span>
-          </div>
-          <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-        </div>
-
-        <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/50 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-rose-700 block">
-              {isEmployee ? 'Rejected Requests' : 'Total Rejected'}
-            </span>
-            <span className="text-2xl font-bold text-slate-900 mt-1 block">{rejectedCount}</span>
-          </div>
-          <AlertCircle className="w-8 h-8 text-rose-500" />
-        </div>
+      {/* Structured Sub-Tabs: Requests | Allocations | Types */}
+      <div className="border-b border-slate-200">
+        <nav className="flex space-x-6">
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`pb-3 text-xs font-semibold transition-colors border-b-2 ${
+              activeTab === 'requests'
+                ? 'border-violet-600 text-violet-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Leave Requests ({requests.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('allocations')}
+            className={`pb-3 text-xs font-semibold transition-colors border-b-2 ${
+              activeTab === 'allocations'
+                ? 'border-violet-600 text-violet-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Balance Allocations
+          </button>
+          <button
+            onClick={() => setActiveTab('types')}
+            className={`pb-3 text-xs font-semibold transition-colors border-b-2 ${
+              activeTab === 'types'
+                ? 'border-violet-600 text-violet-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Leave Policies & Types
+          </button>
+        </nav>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-        <SearchBar
-          value={searchQuery}
-          onChange={(q) => {
-            setSearchQuery(q);
-            setCurrentPage(1);
-          }}
-          placeholder={isEmployee ? 'Search my requests by reason...' : 'Search by employee name or reason...'}
-        />
+      {/* Tab Content */}
+      {activeTab === 'requests' && (
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle">
+            <div className="w-full sm:w-72">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by employee or reason..."
+              />
+            </div>
+            <div className="flex items-center flex-wrap gap-2">
+              <FilterBar
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'Pending', label: 'Pending Approval' },
+                  { value: 'Approved', label: 'Approved' },
+                  { value: 'Rejected', label: 'Refused' },
+                ]}
+                value={selectedStatus}
+                onChange={setSelectedStatus}
+                placeholder="Status"
+              />
+              <FilterBar
+                options={[
+                  { value: 'All', label: 'All Leave Types' },
+                  { value: 'Annual', label: 'Annual' },
+                  { value: 'Casual', label: 'Casual' },
+                  { value: 'Sick', label: 'Sick' },
+                  { value: 'Unpaid', label: 'Unpaid' },
+                ]}
+                value={selectedType}
+                onChange={setSelectedType}
+                placeholder="Type"
+              />
+            </div>
+          </div>
 
-        <FilterBar
-          label="Status"
-          options={[
-            { value: 'All', label: 'All Requests' },
-            { value: 'Pending', label: 'Pending' },
-            { value: 'Approved', label: 'Approved' },
-            { value: 'Rejected', label: 'Rejected' }
-          ]}
-          selectedValue={selectedStatus}
-          onChange={(val) => {
-            setSelectedStatus(val);
-            setCurrentPage(1);
-          }}
-        />
-      </div>
+          {/* Table */}
+          {isLoading ? (
+            <TableSkeleton rows={6} />
+          ) : filteredRequests.length === 0 ? (
+            <EmptyState
+              title="No time off requests found"
+              description="No applications match current filters."
+              actionLabel="Apply for Leave"
+              onAction={() => setIsModalOpen(true)}
+            />
+          ) : (
+            <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-subtle">
+              <Table>
+                <Thead>
+                  <Tr>
+                    <Th>Employee</Th>
+                    <Th>Leave Type</Th>
+                    <Th>Duration & Period</Th>
+                    <Th>Reason</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">Approval Action</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {paginatedRequests.map((req) => (
+                    <Tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
+                      <Td>
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs font-heading block">
+                            {req.employeeName}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {req.department}
+                          </span>
+                        </div>
+                      </Td>
+                      <Td>
+                        <span className="text-xs font-semibold text-slate-800">
+                          {req.leaveType}
+                        </span>
+                      </Td>
+                      <Td>
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">
+                            {req.duration} Day(s)
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {req.startDate} &rarr; {req.endDate}
+                          </span>
+                        </div>
+                      </Td>
+                      <Td className="text-xs text-slate-600 max-w-xs truncate">
+                        {req.reason || 'Personal leave'}
+                      </Td>
+                      <Td>
+                        <Badge status={req.status} size="sm">{req.status}</Badge>
+                      </Td>
+                      <Td className="text-right">
+                        {canAccess(['hr_manager', 'admin']) && req.status === 'Pending' ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="accent"
+                              size="sm"
+                              isLoading={actionLoadingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, 'Approved')}
+                              leftIcon={<Check className="w-3.5 h-3.5" />}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-rose-600 hover:bg-rose-50 border-rose-200"
+                              isLoading={actionLoadingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, 'Rejected')}
+                              leftIcon={<X className="w-3.5 h-3.5" />}
+                            >
+                              Refuse
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {req.reviewedBy ? `By ${req.reviewedBy}` : 'Locked'}
+                          </span>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
 
-      {/* Requests Table */}
-      {isLoading ? (
-        <TableSkeleton rows={6} cols={7} />
-      ) : filteredRequests.length === 0 ? (
-        <EmptyState
-          icon={<Calendar className="w-6 h-6" />}
-          title={isEmployee ? 'No leave requests submitted' : 'No leave requests found in queue'}
-          description={isEmployee ? 'Click Apply for Leave above to schedule your time off.' : 'All leave applications have been reviewed or match filters.'}
-          actionLabel={isEmployee ? 'Apply for Leave' : undefined}
-          onAction={isEmployee ? () => setIsApplyModalOpen(true) : undefined}
-        />
-      ) : (
-        <div className="space-y-2">
+              {totalPages > 1 && (
+                <div className="p-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">
+                    Showing {paginatedRequests.length} of {filteredRequests.length} requests
+                  </span>
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Allocations */}
+      {activeTab === 'allocations' && (
+        <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-subtle space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 font-heading">
+              Balance Allocation Math & Ledger
+            </h3>
+            <p className="text-xs text-slate-500">
+              Clear breakdown of annual quotas, historical deductions, and remaining entitlements.
+            </p>
+          </div>
           <Table>
             <Thead>
               <Tr>
-                <Th>Employee</Th>
-                <Th>Leave Type</Th>
-                <Th>Period</Th>
-                <Th>Duration</Th>
-                <Th>Reason</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>Time Off Type</Th>
+                <Th>Total Allocated</Th>
+                <Th>Used Days</Th>
+                <Th>Remaining Entitlement</Th>
+                <Th>Accrual Policy</Th>
               </Tr>
             </Thead>
             <Tbody>
-              {paginatedRequests.map((req) => (
-                <Tr key={req.id}>
-                  <Td>
-                    <div>
-                      <span className="font-semibold text-slate-900 block leading-tight">
-                        {req.employeeName}
-                      </span>
-                      <span className="text-xs text-slate-400">{req.department}</span>
-                    </div>
-                  </Td>
-                  <Td>
-                    <span className="font-medium text-slate-800">{req.leaveType}</span>
-                  </Td>
-                  <Td className="text-xs text-slate-600 font-medium">
-                    {req.startDate} &rarr; {req.endDate}
-                  </Td>
-                  <Td className="font-semibold text-slate-800">{req.duration} days</Td>
-                  <Td className="text-xs text-slate-600 max-w-xs truncate" title={req.reason}>
-                    {req.reason}
-                  </Td>
-                  <Td>
-                    <Badge status={req.status} size="sm">
-                      {req.status}
-                    </Badge>
-                  </Td>
-                  <Td className="text-right">
-                    {req.status === 'Pending' && canAccess(['hr_manager', 'hr_payroll_manager', 'admin']) ? (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setActionRequest({ id: req.id, action: 'Approved' })}
-                          className="text-xs text-emerald-700 hover:bg-emerald-50 h-8 px-2.5"
-                          leftIcon={<Check className="w-3.5 h-3.5" />}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setActionRequest({ id: req.id, action: 'Rejected' })}
-                          className="text-xs text-rose-700 hover:bg-rose-50 h-8 px-2.5"
-                          leftIcon={<X className="w-3.5 h-3.5" />}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">
-                        {req.reviewedBy ? `Reviewed by ${req.reviewedBy}` : req.status === 'Pending' ? 'Pending Review' : 'Completed'}
-                      </span>
-                    )}
-                  </Td>
+              {balances.map((b) => (
+                <Tr key={b.leaveType}>
+                  <Td className="text-xs font-bold text-slate-900">{b.leaveType} Leave</Td>
+                  <Td className="text-xs font-mono font-semibold">{b.allocated} Days</Td>
+                  <Td className="text-xs font-mono text-amber-700">{b.used} Days</Td>
+                  <Td className="text-xs font-mono font-bold text-emerald-700">{b.remaining} Days</Td>
+                  <Td className="text-xs text-slate-500">Annual recurring credit on Jan 01</Td>
                 </Tr>
               ))}
             </Tbody>
           </Table>
-
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredRequests.length}
-            pageSize={pageSize}
-            onPageChange={(page) => setCurrentPage(page)}
-          />
         </div>
       )}
 
-      {/* Leave Application Modal */}
-      <LeaveRequestModal
-        isOpen={isApplyModalOpen}
-        onClose={() => setIsApplyModalOpen(false)}
-        onSaved={fetchData}
-      />
+      {/* Tab 3: Time Off Types */}
+      {activeTab === 'types' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
+            <h4 className="text-xs font-bold text-slate-900 font-heading">Annual Vacation Leave</h4>
+            <p className="text-xs text-slate-500 mt-1">Paid statutory leave allocated yearly. Requires 3-day advance notice.</p>
+            <span className="inline-block mt-3 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+              Paid Entitlement
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
+            <h4 className="text-xs font-bold text-slate-900 font-heading">Casual & Emergency Leave</h4>
+            <p className="text-xs text-slate-500 mt-1">Short-term emergency absences with immediate manager authorization.</p>
+            <span className="inline-block mt-3 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+              Paid Entitlement
+            </span>
+          </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle">
+            <h4 className="text-xs font-bold text-slate-900 font-heading">Unpaid Leave (LWP)</h4>
+            <p className="text-xs text-slate-500 mt-1">Absences beyond allocated quotas. Triggers automated daily salary deduction during payroll computation.</p>
+            <span className="inline-block mt-3 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+              Payroll Deduction
+            </span>
+          </div>
+        </div>
+      )}
 
-      {/* Approval Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={Boolean(actionRequest)}
-        onClose={() => setActionRequest(null)}
-        onConfirm={handleStatusUpdate}
-        title={actionRequest?.action === 'Approved' ? 'Approve Leave Request' : 'Reject Leave Request'}
-        message={`Are you sure you want to mark this leave request as ${actionRequest?.action}? The employee will see this update.`}
-        confirmLabel={actionRequest?.action === 'Approved' ? 'Approve Application' : 'Reject Application'}
-        isDestructive={actionRequest?.action === 'Rejected'}
+      {/* Modal: New Leave Request */}
+      <LeaveRequestModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSaved={async () => {
+          await fetchTimeOffData();
+          setIsModalOpen(false);
+        }}
       />
     </div>
   );

@@ -9,8 +9,10 @@ interface FilterOption {
 interface FilterBarProps {
   label?: string;
   options: FilterOption[];
-  selectedValue: string;
+  selectedValue?: string;
+  value?: string;
   onChange: (val: string) => void;
+  placeholder?: string;
   className?: string;
 }
 
@@ -18,9 +20,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   label,
   options,
   selectedValue,
+  value,
   onChange,
+  placeholder,
   className = ''
 }) => {
+  const activeValue = value ?? selectedValue ?? '';
   return (
     <div className={`flex items-center gap-1.5 overflow-x-auto py-1 ${className}`}>
       {label && (
@@ -30,7 +35,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </span>
       )}
       {options.map((opt) => {
-        const isSelected = opt.value === selectedValue;
+        const isSelected = opt.value === activeValue;
         return (
           <button
             key={opt.value}

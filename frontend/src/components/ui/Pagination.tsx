@@ -5,8 +5,8 @@ import { Button } from './Button';
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  totalItems: number;
-  pageSize: number;
+  totalItems?: number;
+  pageSize?: number;
   onPageChange: (page: number) => void;
   className?: string;
 }
@@ -15,14 +15,14 @@ export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   totalItems,
-  pageSize,
+  pageSize = 8,
   onPageChange,
   className = ''
 }) => {
-  if (totalPages <= 1 && totalItems <= pageSize) return null;
+  if (totalPages <= 1) return null;
 
-  const startItem = Math.min((currentPage - 1) * pageSize + 1, totalItems);
-  const endItem = Math.min(currentPage * pageSize, totalItems);
+  const startItem = totalItems !== undefined ? Math.min((currentPage - 1) * pageSize + 1, totalItems) : null;
+  const endItem = totalItems !== undefined ? Math.min(currentPage * pageSize, totalItems) : null;
 
   return (
     <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-4 bg-white border-t border-slate-100 ${className}`}>

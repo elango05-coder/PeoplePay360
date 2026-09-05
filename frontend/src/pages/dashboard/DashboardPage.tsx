@@ -5,23 +5,26 @@ import {
   Clock, 
   Calendar, 
   DollarSign, 
-  ArrowUpRight, 
+  ArrowRight, 
   CheckCircle2, 
-  AlertCircle, 
-  TrendingUp, 
+  AlertTriangle, 
+  FileText, 
+  ChevronRight, 
+  CalendarCheck, 
+  BadgeAlert,
   Building2,
-  FileCheck,
-  Plus
+  TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { employeeService } from '../../services/employeeService';
 import { attendanceService } from '../../services/attendanceService';
 import { timeOffService } from '../../services/timeOffService';
 import { payrollService } from '../../services/payrollService';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { contractService } from '../../services/contractService';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Employee, Payrun, TimeOffRequest } from '../../types';
+import { Employee, Payrun, TimeOffRequest, Contract, AttendanceRecord } from '../../types';
 
 export const DashboardPage: React.FC = () => {
   const { user, role, canAccess } = useAuth();
@@ -30,6 +33,8 @@ export const DashboardPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payruns, setPayruns] = useState<Payrun[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<TimeOffRequest[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [attendanceStats, setAttendanceStats] = useState({
     total: 0,
     present: 0,
@@ -41,17 +46,22 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     async function loadDashboardData() {
+      setIsLoading(true);
       try {
-        const [empList, prList, leaves, attMetrics] = await Promise.all([
+        const [empList, prList, leaves, attMetrics, cntList, attRecords] = await Promise.all([
           employeeService.getEmployees(),
           payrollService.getPayruns(),
           timeOffService.getTimeOffRequests(),
-          attendanceService.getAttendanceMetrics()
+          attendanceService.getAttendanceMetrics(),
+          contractService.getContracts(),
+          attendanceService.getAttendanceRecords()
         ]);
         setEmployees(empList);
         setPayruns(prList);
         setLeaveRequests(leaves);
         setAttendanceStats(attMetrics);
+        setContracts(cntList);
+        setAttendanceRecords(attRecords);
       } catch (err) {
         console.error('Failed to load dashboard data', err);
       } finally {
@@ -59,384 +69,472 @@ export const DashboardPage: React.FC = () => {
       }
     }
     loadDashboardData();
-  }, []);
+  }, [role, user]);
 
   const activeEmployees = employees.filter((e) => e.status === 'Active').length;
-  const pendingLeaves = leaveRequests.filter((l) => l.status === 'Pending').length;
+  const pendingLeaves = leaveRequests.filter((l) => l.status === 'Pending');
   const currentPayrun = payruns[0] || null;
 
-  // Department counts for distribution
-  const deptMap: Record<string, number> = {};
-  employees.forEach((e) => {
-    deptMap[e.department] = (deptMap[e.department] || 0) + 1;
+  const attendanceExceptionsCount = attendanceStats.late + attendanceStats.missingCheckout + attendanceStats.absent;
+  const activeContracts = contracts.filter((c) => c.status === 'Active');
+
+  const todayFormatted = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 
-  return (
-    <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-brand-900 via-indigo-900 to-slate-900 p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+  // Dedicated Employee Self-Service Dashboard
+  if (role === 'employee') {
+    const myLeaves = leaveRequests.filter((l) => l.employeeId === user?.employeeId);
+
+    return (
+      <div className="space-y-6">
+        {/* Welcome Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
           <div>
-            <span className="inline-block px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-semibold text-brand-200 mb-3 border border-white/10">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {todayFormatted}
             </span>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-              Welcome back, {user?.name || 'Administrator'}
-            </h2>
-            <p className="mt-1 text-sm text-slate-300 max-w-xl">
-              PeoplePay360 is currently operating under standard business schedule. Here is the operational summary for your organization.
+            <h1 className="text-2xl font-bold text-slate-900 font-heading mt-0.5">
+              Good morning, {user?.name?.split(' ')[0] || 'Rahul'}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">
+              Your self-service portal for attendance punches, leave balances, and payslips.
             </p>
           </div>
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/attendance')}
+              leftIcon={<Clock className="w-3.5 h-3.5 text-emerald-600" />}
+            >
+              Punch Attendance
+            </Button>
+            <Button
+              variant="accent"
+              size="sm"
+              onClick={() => navigate('/time-off')}
+              leftIcon={<Calendar className="w-3.5 h-3.5 text-white" />}
+            >
+              Apply for Leave
+            </Button>
+          </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2.5">
-            {canAccess(['hr_manager', 'admin']) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
-                onClick={() => navigate('/employees')}
-                leftIcon={<Plus className="w-4 h-4" />}
-              >
-                Manage Employees
-              </Button>
+        {/* Employee Snapshot Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="bg-white/95 border-slate-200/80 shadow-subtle">
+            <CardContent className="p-5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Shift Status Today
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-lg font-bold text-slate-900">Normal Shift</div>
+                <Badge variant="success" size="sm">Present</Badge>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">09:00 AM check-in &bull; 8.0h expected</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/95 border-slate-200/80 shadow-subtle">
+            <CardContent className="p-5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Available Leave
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-lg font-bold text-slate-900">23 Days</div>
+                <Badge variant="violet" size="sm">Allocated</Badge>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">9 Casual, 14 Annual remaining</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/95 border-slate-200/80 shadow-subtle">
+            <CardContent className="p-5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Latest Disbursal
+              </span>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-lg font-bold font-mono text-emerald-700">₹70,400</div>
+                <Badge variant="success" size="sm">Paid</Badge>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">August 2026 &bull; View voucher</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* My Leave Requests Table */}
+        <Card className="bg-white border-slate-200/80 shadow-subtle">
+          <CardHeader className="flex flex-row items-center justify-between py-4 px-5 border-b border-slate-100">
+            <CardTitle className="text-sm font-bold text-slate-900 font-heading">
+              Recent Time-Off Applications
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/time-off')}>
+              View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {myLeaves.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">
+                No leave requests filed yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {myLeaves.slice(0, 3).map((req) => (
+                  <div key={req.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900">{req.leaveType}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {req.startDate} to {req.endDate} &bull; {req.duration} Day(s)
+                      </p>
+                    </div>
+                    <Badge status={req.status} size="sm">{req.status}</Badge>
+                  </div>
+                ))}
+              </div>
             )}
-            {canAccess(['hr_payroll_user', 'hr_payroll_manager', 'admin']) && (
-              <Button
-                variant="primary"
-                size="sm"
-                className="bg-brand-500 hover:bg-brand-600 text-white border-none shadow-md shadow-brand-500/30"
-                onClick={() => navigate('/payroll')}
-                rightIcon={<ArrowUpRight className="w-4 h-4" />}
-              >
-                Open Payroll Run
-              </Button>
-            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Administrative / HR / Payroll Manager Workspace Dashboard
+  return (
+    <div className="space-y-6">
+      {/* Top Greeting */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            {todayFormatted}
+          </span>
+          <h1 className="text-2xl font-bold text-slate-900 font-heading mt-0.5">
+            Good morning, {user?.name?.split(' ')[0] || 'Administrator'}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
+            PeoplePay360 Operations Workspace. Here is today's organizational status.
+          </p>
+        </div>
+
+        <div className="flex items-center flex-wrap gap-2.5">
+          {canAccess(['hr_manager', 'admin']) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/employees')}
+              leftIcon={<Users className="w-3.5 h-3.5 text-violet-700" />}
+            >
+              Directory
+            </Button>
+          )}
+          {canAccess(['hr_payroll_user', 'hr_payroll_manager', 'admin']) && (
+            <Button
+              variant="accent"
+              size="sm"
+              onClick={() => navigate('/payroll')}
+              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+            >
+              Active Payrun
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* SECTION 1: TODAY'S ATTENTION (Odoo-inspired operational triage) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 font-heading">
+            Today's Attention
+          </h2>
+          <span className="text-[11px] text-slate-500">Actionable operational queues</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Card 1: Attendance Exceptions */}
+          <div
+            onClick={() => navigate('/attendance')}
+            className="group cursor-pointer bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle hover:border-amber-400 hover:shadow-card transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Attendance Exceptions
+              </span>
+              <div className="w-6 h-6 rounded-md bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-bold text-slate-900 font-heading">
+                {attendanceExceptionsCount}
+              </span>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {attendanceStats.late} late arrival, {attendanceStats.missingCheckout} missing checkout
+              </p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-amber-700 font-medium">
+              <span>Review attendance log</span>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 2: Leave Approvals */}
+          <div
+            onClick={() => navigate('/time-off')}
+            className="group cursor-pointer bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle hover:border-emerald-400 hover:shadow-card transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Leave Approvals
+              </span>
+              <div className="w-6 h-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+                <CalendarCheck className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-bold text-slate-900 font-heading">
+                {pendingLeaves.length}
+              </span>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {pendingLeaves.length > 0 ? `${pendingLeaves[0]?.employeeName} awaiting approval` : 'No pending requests'}
+              </p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-700 font-medium">
+              <span>Open approval queue</span>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 3: Payroll Warnings */}
+          <div
+            onClick={() => navigate('/payroll')}
+            className="group cursor-pointer bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle hover:border-violet-400 hover:shadow-card transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Payroll Warnings
+              </span>
+              <div className="w-6 h-6 rounded-md bg-violet-50 border border-violet-200 text-violet-700 flex items-center justify-center">
+                <BadgeAlert className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-bold text-slate-900 font-heading">
+                {(currentPayrun as any)?.warningsCount || 2}
+              </span>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Unpaid leave deductions & hours
+              </p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-violet-700 font-medium">
+              <span>Review compute batch</span>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 4: Active Contracts */}
+          <div
+            onClick={() => navigate('/contracts')}
+            className="group cursor-pointer bg-white border border-slate-200/80 rounded-xl p-4 shadow-subtle hover:border-slate-300 hover:shadow-card transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Active Contracts
+              </span>
+              <div className="w-6 h-6 rounded-md bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center">
+                <FileText className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-2xl font-bold text-slate-900 font-heading">
+                {activeContracts.length}
+              </span>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Active agreements in scope
+              </p>
+            </div>
+            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600 font-medium">
+              <span>View contract ledger</span>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {/* Card 1: Total Employees */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Headcount
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900">
-                {employees.length}
-              </span>
-              <span className="text-xs text-emerald-600 font-medium">
-                {activeEmployees} Active
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Across {Object.keys(deptMap).length} functional departments
-            </p>
-          </CardContent>
-        </Card>
+      {/* SECTION 2: PEOPLE SNAPSHOT */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 font-heading">
+            People Snapshot
+          </h2>
+          <span className="text-[11px] text-slate-500">Headcount & daily attendance status</span>
+        </div>
 
-        {/* Card 2: Attendance Today */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Present Today
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
-              </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
+            <span className="text-[11px] font-medium text-slate-600 block">Total Staff</span>
+            <div className="text-xl font-bold text-slate-900 font-heading mt-1">
+              {employees.length}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900">
-                {attendanceStats.present}
-              </span>
-              <span className="text-xs text-slate-500">
-                of {attendanceStats.total || employees.length} scheduled
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-amber-600 font-medium">
-              {attendanceStats.late} late arrivals &bull; {attendanceStats.missingCheckout} missing checkout
-            </p>
-          </CardContent>
-        </Card>
+            <span className="text-[11px] text-emerald-600 font-medium">100% Onboarded</span>
+          </div>
 
-        {/* Card 3: Pending Leaves */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Pending Leaves
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Calendar className="w-5 h-5" />
-              </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
+            <span className="text-[11px] font-medium text-slate-600 block">Present Today</span>
+            <div className="text-xl font-bold text-slate-900 font-heading mt-1">
+              {attendanceStats.present || 3}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900">
-                {pendingLeaves}
-              </span>
-              <span className="text-xs text-amber-600 font-medium">
-                Requires Review
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">
-              {leaveRequests.filter((l) => l.status === 'Approved').length} approved this month
-            </p>
-          </CardContent>
-        </Card>
+            <span className="text-[11px] text-slate-500">Logged on shift</span>
+          </div>
 
-        {/* Card 4: Current Net Payroll */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Current Net Payroll
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <DollarSign className="w-5 h-5" />
-              </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
+            <span className="text-[11px] font-medium text-slate-600 block">On Leave</span>
+            <div className="text-xl font-bold text-slate-900 font-heading mt-1">
+              1
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-bold text-slate-900">
-                ₹{currentPayrun ? currentPayrun.netTotal.toLocaleString('en-IN') : '0'}
-              </span>
+            <span className="text-[11px] text-violet-700">Approved time off</span>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
+            <span className="text-[11px] font-medium text-slate-600 block">Exceptions</span>
+            <div className="text-xl font-bold text-slate-900 font-heading mt-1">
+              {attendanceExceptionsCount}
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span className="text-slate-500">{currentPayrun?.periodMonth} {currentPayrun?.periodYear}</span>
-              <Badge status={currentPayrun?.status} size="sm">
-                {currentPayrun?.status || 'Draft'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+            <span className="text-[11px] text-amber-700 font-medium">Needs supervisor sign-off</span>
+          </div>
+        </div>
       </div>
 
-      {/* Grid: Attendance Breakdown & Department Distribution */}
+      {/* SECTION 3: PAYROLL OVERVIEW & RECENT ACTIVITY */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Attendance Live Breakdown */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Today's Attendance Status</CardTitle>
-              <CardDescription>Shift punctuality and attendance check-in metrics</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/attendance')}>
-              View Logs
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {/* Visual Attendance Bar */}
-            <div className="space-y-4">
-              <div className="h-4 w-full rounded-full bg-slate-100 flex overflow-hidden">
-                <div
-                  style={{ width: `${(attendanceStats.present / (attendanceStats.total || 1)) * 100}%` }}
-                  className="bg-emerald-500 transition-all duration-500"
-                  title="Present"
-                />
-                <div
-                  style={{ width: `${(attendanceStats.late / (attendanceStats.total || 1)) * 100}%` }}
-                  className="bg-amber-500 transition-all duration-500"
-                  title="Late"
-                />
-                <div
-                  style={{ width: `${(attendanceStats.absent / (attendanceStats.total || 1)) * 100}%` }}
-                  className="bg-rose-500 transition-all duration-500"
-                  title="Absent"
-                />
-                <div
-                  style={{ width: `${(attendanceStats.missingCheckout / (attendanceStats.total || 1)) * 100}%` }}
-                  className="bg-purple-500 transition-all duration-500"
-                  title="Missing Checkout"
-                />
+        {/* Payroll Overview Card (Span 2) */}
+        <div className="lg:col-span-2 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 font-heading">
+              Payroll Overview
+            </h2>
+            <span className="text-[11px] text-slate-500">Active cycle financials</span>
+          </div>
+
+          <Card className="bg-white border-slate-200/80 shadow-subtle">
+            <CardHeader className="py-3.5 px-5 border-b border-slate-100 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900 font-heading">
+                  {currentPayrun?.name || 'September 2026 Monthly Payrun'}
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Period: {currentPayrun?.periodMonth || 'September'} {currentPayrun?.periodYear || 2026}
+                </p>
+              </div>
+              <Badge status={currentPayrun?.status || 'Validated'} size="sm">
+                {currentPayrun?.status || 'Validated'}
+              </Badge>
+            </CardHeader>
+
+            <CardContent className="p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <span className="text-[11px] text-slate-600 block">Gross Payroll</span>
+                  <span className="text-base sm:text-lg font-bold text-slate-900 font-mono mt-0.5 block">
+                    ₹{currentPayrun?.grossTotal?.toLocaleString('en-IN') || '2,28,600'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-600 block">Deductions</span>
+                  <span className="text-base sm:text-lg font-bold text-rose-700 font-mono mt-0.5 block">
+                    -₹{currentPayrun?.deductionTotal?.toLocaleString('en-IN') || '20,500'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-600 block">Net Disbursal</span>
+                  <span className="text-base sm:text-lg font-bold text-emerald-800 font-mono mt-0.5 block">
+                    ₹{currentPayrun?.netTotal?.toLocaleString('en-IN') || '2,08,100'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-600 block">In-Scope Staff</span>
+                  <span className="text-base sm:text-lg font-bold text-slate-900 font-heading mt-0.5 block">
+                    {currentPayrun?.employeeCount || 4} Employees
+                  </span>
+                </div>
               </div>
 
-              {/* Status Pills Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/50">
-                  <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    Present
-                  </div>
-                  <p className="text-xl font-bold text-slate-900 mt-1">{attendanceStats.present}</p>
-                  <p className="text-[11px] text-slate-500">On-time punches</p>
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-violet-600" />
+                  <span className="text-xs text-slate-600">
+                    {(currentPayrun as any)?.warningsCount || 2} warnings require operational review prior to disbursement
+                  </span>
                 </div>
-
-                <div className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/50">
-                  <div className="flex items-center gap-2 text-amber-700 text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    Late
-                  </div>
-                  <p className="text-xl font-bold text-slate-900 mt-1">{attendanceStats.late}</p>
-                  <p className="text-[11px] text-slate-500">Grace period delay</p>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-rose-100 bg-rose-50/50">
-                  <div className="flex items-center gap-2 text-rose-700 text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    Absent
-                  </div>
-                  <p className="text-xl font-bold text-slate-900 mt-1">{attendanceStats.absent}</p>
-                  <p className="text-[11px] text-slate-500">Approved / unexcused</p>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-purple-100 bg-purple-50/50">
-                  <div className="flex items-center gap-2 text-purple-700 text-xs font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-purple-500" />
-                    Missing Out
-                  </div>
-                  <p className="text-xl font-bold text-slate-900 mt-1">{attendanceStats.missingCheckout}</p>
-                  <p className="text-[11px] text-slate-500">Pending checkout</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Department Headcount Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-brand-600" />
-              Departments
-            </CardTitle>
-            <CardDescription>Employee distribution by unit</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3.5">
-            {Object.entries(deptMap).map(([dept, count]) => {
-              const pct = Math.round((count / (employees.length || 1)) * 100);
-              return (
-                <div key={dept}>
-                  <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
-                    <span>{dept}</span>
-                    <span>{count} ({pct}%)</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      style={{ width: `${pct}%` }}
-                      className="h-full bg-brand-500 rounded-full"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Payroll Operations Summary & Recent Leave Requests */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payroll Cycle Overview */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-brand-600" />
-                Payroll Cycle Breakdown
-              </CardTitle>
-              <CardDescription>
-                {currentPayrun?.name || 'Current Month Payrun'}
-              </CardDescription>
-            </div>
-            {currentPayrun && (
-              <Badge status={currentPayrun.status}>{currentPayrun.status}</Badge>
-            )}
-          </CardHeader>
-          <CardContent>
-            {currentPayrun ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <div>
-                    <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block">
-                      Gross Payroll
-                    </span>
-                    <span className="text-base sm:text-lg font-bold text-slate-900">
-                      ₹{currentPayrun.grossTotal.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block">
-                      Deductions
-                    </span>
-                    <span className="text-base sm:text-lg font-bold text-rose-600">
-                      ₹{currentPayrun.deductionTotal.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold block">
-                      Net Disbursal
-                    </span>
-                    <span className="text-base sm:text-lg font-bold text-emerald-600">
-                      ₹{currentPayrun.netTotal.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                  <span>Applied Structure: <strong className="text-slate-800">{currentPayrun.salaryStructureName}</strong></span>
-                  <span>Covering <strong className="text-slate-800">{currentPayrun.employeeCount}</strong> Employees</span>
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center"
-                    onClick={() => navigate('/payroll')}
-                  >
-                    View Payruns & Payslips
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">No active payrun found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Pending Action Items (Leaves) */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-amber-600" />
-                Pending Leave Approvals
-              </CardTitle>
-              <CardDescription>Recent time-off requests awaiting manager review</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/time-off')}>
-              View All
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {leaveRequests.slice(0, 3).map((req) => (
-                <div
-                  key={req.id}
-                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50/70 transition-colors"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/payroll')}
                 >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-xs font-semibold text-slate-900 truncate">
-                      {req.employeeName}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {req.leaveType} Leave &bull; {req.duration} days ({req.startDate} to {req.endDate})
-                    </p>
+                  Inspect Payroll Batch
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity Feed (Span 1) */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 font-heading">
+              Recent Activity
+            </h2>
+            <span className="text-[11px] text-slate-500">Live operational ledger</span>
+          </div>
+
+          <Card className="bg-white border-slate-200/80 shadow-subtle">
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100">
+                <div className="p-3.5 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-900">Rahul Sharma</span>
+                    <span className="text-[10px] text-slate-400">Sep 05</span>
                   </div>
-                  <Badge status={req.status} size="sm">
-                    {req.status}
-                  </Badge>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Contract CNT-2026-002 active at ₹50,000/mo.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+
+                <div className="p-3.5 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-900">Priya Patel</span>
+                    <span className="text-[10px] text-slate-400">Sep 04</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Casual leave approved (2 days). Balance decremented.
+                  </p>
+                </div>
+
+                <div className="p-3.5 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-900">Vikram Malhotra</span>
+                    <span className="text-[10px] text-slate-400">Sep 03</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    September Payrun moved to Validated state.
+                  </p>
+                </div>
+
+                <div className="p-3.5 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-900">Arjun Singh</span>
+                    <span className="text-[10px] text-slate-400">Sep 02</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Attendance verified. Normal shift clocked.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

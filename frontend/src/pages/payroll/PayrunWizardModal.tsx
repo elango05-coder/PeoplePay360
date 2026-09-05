@@ -8,7 +8,8 @@ import {
   Users, 
   CheckCircle2, 
   DollarSign, 
-  Sparkles 
+  Building2,
+  ShieldCheck
 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
@@ -33,17 +34,19 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
 }) => {
   const { success, error } = useToast();
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [structures, setStructures] = useState<SalaryStructure[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
 
-  // Wizard state
+  // Step 1: Scope & Period
   const [selectedStructureId, setSelectedStructureId] = useState('');
-  const [payrunName, setPayrunName] = useState('September 2026 Monthly Payrun');
-  const [periodMonth, setPeriodMonth] = useState('September');
+  const [payrunName, setPayrunName] = useState('October 2026 Monthly Payrun');
+  const [periodMonth, setPeriodMonth] = useState('October');
   const [periodYear, setPeriodYear] = useState(2026);
-  const [startDate, setStartDate] = useState('2026-09-01');
-  const [endDate, setEndDate] = useState('2026-09-30');
+  const [startDate, setStartDate] = useState('2026-10-01');
+  const [endDate, setEndDate] = useState('2026-10-31');
+
+  // Step 2: Employee Selection
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -84,14 +87,17 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
 
   const selectedStructure = structures.find((s) => s.id === selectedStructureId);
 
-  // Approximate totals for review step presentation
-  const estimatedGross = selectedEmployeeIds.length * 68000;
-  const estimatedDeductions = selectedEmployeeIds.length * 6200;
-  const estimatedNet = estimatedGross - estimatedDeductions;
-
   const handleSubmit = async () => {
+    if (selectedEmployeeIds.length === 0) {
+      error('Selection Required', 'Please select at least one employee for this payroll cycle.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const estimatedGross = selectedEmployeeIds.length * 52000;
+      const estimatedDeductions = selectedEmployeeIds.length * 4800;
+
       await payrollService.createPayrun({
         name: payrunName,
         salaryStructureId: selectedStructureId,
@@ -103,7 +109,7 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
         employeeCount: selectedEmployeeIds.length,
         grossTotal: estimatedGross,
         deductionTotal: estimatedDeductions,
-        netTotal: estimatedNet,
+        netTotal: estimatedGross - estimatedDeductions,
         status: 'Draft'
       });
 
@@ -118,130 +124,100 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
     }
   };
 
-  const steps = [
-    { number: 1, title: 'Structure' },
-    { number: 2, title: 'Period' },
-    { number: 3, title: 'Employees' },
-    { number: 4, title: 'Review' }
-  ];
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create New Payrun (Wizard)"
-      description="Step-by-step wizard to initialize a company payroll cycle."
+      title="Create New Payroll Run"
+      description="Two-step payroll initialization wizard: define scope & period, then select in-scope employees."
       maxWidth="2xl"
     >
       <div className="space-y-6">
-        {/* Step Indicator Bar */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          {steps.map((s, index) => {
-            const isDone = currentStep > s.number;
-            const isCurrent = currentStep === s.number;
-            return (
-              <React.Fragment key={s.number}>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                      isDone
-                        ? 'bg-emerald-500 text-white'
-                        : isCurrent
-                        ? 'bg-brand-600 text-white ring-4 ring-brand-100'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    {isDone ? <Check className="w-4 h-4" /> : s.number}
-                  </div>
-                  <span
-                    className={`text-xs font-semibold hidden sm:inline ${
-                      isCurrent ? 'text-brand-700' : 'text-slate-500'
-                    }`}
-                  >
-                    {s.title}
-                  </span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`h-0.5 flex-1 mx-2 ${currentStep > index + 1 ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-                )}
-              </React.Fragment>
-            );
-          })}
+        {/* Step Indicator Header */}
+        <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
+          <div
+            className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+              currentStep === 1
+                ? 'bg-white text-violet-950 shadow-xs font-bold'
+                : 'text-slate-500'
+            }`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${
+              currentStep === 1 ? 'bg-violet-700 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              1
+            </span>
+            <span>Step 1: Scope & Period</span>
+          </div>
+
+          <div
+            className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+              currentStep === 2
+                ? 'bg-white text-violet-950 shadow-xs font-bold'
+                : 'text-slate-500'
+            }`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${
+              currentStep === 2 ? 'bg-violet-700 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              2
+            </span>
+            <span>Step 2: Employee Selection</span>
+          </div>
         </div>
 
-        {/* Step 1: Select Structure */}
+        {/* STEP 1: Payroll Scope & Period */}
         {currentStep === 1 && (
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-800">
-              Step 1: Select Salary Structure Rules
-            </h4>
-            <p className="text-xs text-slate-500">
-              Choose the statutory ruleset to calculate basic salary, allowances, and tax deductions.
-            </p>
-
-            <div className="space-y-3">
-              {structures.map((st) => (
-                <div
-                  key={st.id}
-                  onClick={() => setSelectedStructureId(st.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start justify-between ${
-                    selectedStructureId === st.id
-                      ? 'border-brand-500 bg-brand-50/50 ring-2 ring-brand-300 shadow-xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <div>
-                    <h5 className="font-semibold text-slate-900 text-sm">{st.name}</h5>
-                    <p className="text-xs text-slate-500 mt-0.5">{st.description}</p>
-                    <span className="inline-block mt-2 text-[11px] font-medium text-brand-700 bg-brand-100 px-2 py-0.5 rounded">
-                      {st.rules.length} configured rules
-                    </span>
-                  </div>
-                  {selectedStructureId === st.id && (
-                    <CheckCircle2 className="w-5 h-5 text-brand-600 shrink-0" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Payroll Period */}
-        {currentStep === 2 && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-800">
-              Step 2: Select Payroll Period & Schedule
-            </h4>
-
             <Input
-              label="Payrun Name"
+              label="Payrun Batch Name"
               value={payrunName}
               onChange={(e) => setPayrunName(e.target.value)}
-              placeholder="e.g. September 2026 Regular Payrun"
+              placeholder="e.g. October 2026 Monthly Payrun"
               required
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Applied Salary Structure
+              </label>
               <Select
-                label="Period Month"
-                value={periodMonth}
-                onChange={(e) => setPeriodMonth(e.target.value)}
-                options={[
-                  'January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December'
-                ].map((m) => ({ value: m, label: m }))}
+                value={selectedStructureId}
+                onChange={(e) => setSelectedStructureId(e.target.value)}
+                options={structures.map((s) => ({
+                  value: s.id,
+                  label: `${s.name} (${s.rules?.length || 0} Rules)`
+                }))}
               />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Defines the sequential computation rules (Earnings &rarr; Deductions &rarr; Net).
+              </p>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Payroll Month
+                </label>
+                <Select
+                  value={periodMonth}
+                  onChange={(e) => setPeriodMonth(e.target.value)}
+                  options={[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((m) => ({ value: m, label: m }))}
+                />
+              </div>
               <Input
-                label="Period Year"
+                label="Payroll Year"
                 type="number"
                 value={periodYear}
-                onChange={(e) => setPeriodYear(Number(e.target.value))}
+                onChange={(e) => setPeriodYear(parseInt(e.target.value))}
                 required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Cycle Start Date"
                 type="date"
@@ -260,51 +236,60 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
           </div>
         )}
 
-        {/* Step 3: Select Employees */}
-        {currentStep === 3 && (
+        {/* STEP 2: Employee Selection */}
+        {currentStep === 2 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
-                <h4 className="text-sm font-bold text-slate-800">
-                  Step 3: Select Eligible Employees
+                <h4 className="text-xs font-bold text-slate-900 font-heading">
+                  Eligible Employees ({selectedEmployeeIds.length} of {employees.length} Selected)
                 </h4>
-                <p className="text-xs text-slate-500">
-                  {selectedEmployeeIds.length} of {employees.length} employees selected for this payrun.
+                <p className="text-[11px] text-slate-500">
+                  Select active staff to include in this calculation cycle.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-xs font-semibold text-violet-700 hover:text-violet-800"
+              >
                 {selectedEmployeeIds.length === employees.length ? 'Deselect All' : 'Select All'}
-              </Button>
+              </button>
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2">
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
               {employees.map((emp) => {
-                const isChecked = selectedEmployeeIds.includes(emp.id);
+                const isSelected = selectedEmployeeIds.includes(emp.id);
+
                 return (
                   <div
                     key={emp.id}
                     onClick={() => toggleEmployee(emp.id)}
-                    className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors text-xs ${
-                      isChecked ? 'bg-brand-50/70 text-slate-900 font-medium' : 'hover:bg-slate-50 text-slate-700'
+                    className={`p-3 rounded-lg border text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'border-violet-500 bg-violet-50/60'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}} // Handled by parent div
-                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="rounded text-violet-600 focus:ring-violet-500"
                       />
                       <div>
-                        <span className="font-semibold block">
+                        <span className="font-bold text-slate-900 block">
                           {emp.firstName} {emp.lastName}
                         </span>
-                        <span className="text-[11px] text-slate-400">
-                          {emp.position} &bull; {emp.department}
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {emp.code} &bull; {emp.department} &bull; {emp.position}
                         </span>
                       </div>
                     </div>
-                    <span className="font-mono text-slate-500">{emp.code}</span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      Eligible
+                    </span>
                   </div>
                 );
               })}
@@ -312,83 +297,41 @@ export const PayrunWizardModal: React.FC<PayrunWizardModalProps> = ({
           </div>
         )}
 
-        {/* Step 4: Review & Confirm */}
-        {currentStep === 4 && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-800">
-              Step 4: Review Payrun Parameters
-            </h4>
-            <p className="text-xs text-slate-500">
-              Confirm payrun parameters before generating computation drafts.
-            </p>
-
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Payrun Name:</span>
-                <span className="font-semibold text-slate-800">{payrunName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Salary Structure:</span>
-                <span className="font-semibold text-brand-700">{selectedStructure?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Period:</span>
-                <span className="font-semibold text-slate-800">{periodMonth} {periodYear} ({startDate} &rarr; {endDate})</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Included Employees:</span>
-                <span className="font-semibold text-slate-800">{selectedEmployeeIds.length} members</span>
-              </div>
-              <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-sm text-slate-900">
-                <span>Estimated Net Payout:</span>
-                <span className="text-emerald-600">₹{estimatedNet.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-              <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Submitting will create this payrun with status <strong>Draft</strong>. You can compute, review payslips, validate, and mark as paid in the payroll dashboard.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Wizard Navigation Footer */}
+        {/* Wizard Footer Navigation */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (currentStep === 1) onClose();
-              else setCurrentStep(currentStep - 1);
-            }}
-            disabled={isSubmitting}
-            leftIcon={currentStep > 1 ? <ChevronLeft className="w-4 h-4" /> : undefined}
-          >
-            {currentStep === 1 ? 'Cancel' : 'Back'}
-          </Button>
-
-          {currentStep < 4 ? (
-            <Button
-              size="sm"
-              onClick={() => setCurrentStep(currentStep + 1)}
-              disabled={
-                (currentStep === 1 && !selectedStructureId) ||
-                (currentStep === 3 && selectedEmployeeIds.length === 0)
-              }
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Continue
+          {currentStep === 1 ? (
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
             </Button>
           ) : (
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentStep(1)}
+              leftIcon={<ChevronLeft className="w-4 h-4" />}
+            >
+              Back to Scope
+            </Button>
+          )}
+
+          {currentStep === 1 ? (
+            <Button
               variant="primary"
               size="sm"
-              onClick={handleSubmit}
-              isLoading={isSubmitting}
+              onClick={() => setCurrentStep(2)}
+              rightIcon={<ChevronRight className="w-4 h-4" />}
             >
-              Generate Payrun
+              Continue to Employee Selection
+            </Button>
+          ) : (
+            <Button
+              variant="accent"
+              size="sm"
+              isLoading={isSubmitting}
+              onClick={handleSubmit}
+              rightIcon={<Check className="w-4 h-4" />}
+            >
+              Create Payrun Batch
             </Button>
           )}
         </div>

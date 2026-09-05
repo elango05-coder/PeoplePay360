@@ -6,7 +6,8 @@ export type BadgeVariant =
   | 'danger' 
   | 'info' 
   | 'neutral' 
-  | 'purple';
+  | 'purple'
+  | 'violet';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -28,14 +29,14 @@ export const Badge: React.FC<BadgeProps> = ({
 
   if (!variant && status) {
     const s = status.toLowerCase();
-    if (['active', 'present', 'approved', 'paid', 'computed'].includes(s)) {
+    if (['active', 'present', 'approved', 'paid'].includes(s)) {
       computedVariant = 'success';
     } else if (['pending', 'late', 'draft', 'on leave'].includes(s)) {
       computedVariant = 'warning';
     } else if (['absent', 'rejected', 'terminated', 'missing checkout'].includes(s)) {
       computedVariant = 'danger';
-    } else if (['validated', 'corrected', 'overtime'].includes(s)) {
-      computedVariant = 'purple';
+    } else if (['validated', 'computed', 'corrected', 'overtime'].includes(s)) {
+      computedVariant = 'violet';
     } else if (['expired', 'inactive'].includes(s)) {
       computedVariant = 'neutral';
     } else {
@@ -49,7 +50,8 @@ export const Badge: React.FC<BadgeProps> = ({
     danger: 'bg-rose-50 text-rose-700 border-rose-200/80',
     info: 'bg-blue-50 text-blue-700 border-blue-200/80',
     neutral: 'bg-slate-100 text-slate-700 border-slate-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200/80'
+    purple: 'bg-purple-50 text-purple-700 border-purple-200/80',
+    violet: 'bg-violet-50 text-violet-700 border-violet-200/80'
   };
 
   const dotColors: Record<BadgeVariant, string> = {
@@ -58,7 +60,8 @@ export const Badge: React.FC<BadgeProps> = ({
     danger: 'bg-rose-500',
     info: 'bg-blue-500',
     neutral: 'bg-slate-400',
-    purple: 'bg-purple-500'
+    purple: 'bg-purple-500',
+    violet: 'bg-violet-600'
   };
 
   const sizeStyles = {

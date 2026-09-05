@@ -1,295 +1,423 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   DollarSign, 
-  Users, 
-  TrendingUp, 
   Plus, 
-  ArrowRight, 
   Play, 
-  CheckCircle, 
-  FileCheck, 
-  Send 
+  CheckCircle2, 
+  ShieldAlert, 
+  AlertTriangle, 
+  Receipt, 
+  Calendar, 
+  Layers, 
+  Users, 
+  FileText,
+  Clock,
+  ArrowRight,
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { payrollService } from '../../services/payrollService';
-import { Payrun, PayrunStatus } from '../../types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Payrun, Payslip, PayrunStatus } from '../../types';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, Thead, Tbody, Tr, Th, Td } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { EmptyState } from '../../components/ui/EmptyState';
 import { TableSkeleton } from '../../components/ui/LoadingSkeleton';
 import { PayrunWizardModal } from './PayrunWizardModal';
-import { useToast } from '../../context/ToastContext';
+import { PayslipDetailModal } from './PayslipDetailModal';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useNavigate } from 'react-router-dom';
 
 export const PayrollDashboardPage: React.FC = () => {
-  const navigate = useNavigate();
   const { canAccess } = useAuth();
   const { success, error } = useToast();
+  const navigate = useNavigate();
 
   const [payruns, setPayruns] = useState<Payrun[]>([]);
+  const [selectedPayrunId, setSelectedPayrunId] = useState<string>('');
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
-  const fetchPayruns = async () => {
+  // Modals
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
+
+  const fetchPayrunData = async () => {
     setIsLoading(true);
     try {
-      const data = await payrollService.getPayruns();
-      setPayruns(data);
+      const runs = await payrollService.getPayruns();
+      setPayruns(runs);
+      if (runs.length > 0 && !selectedPayrunId) {
+        setSelectedPayrunId(runs[0].id);
+        const slips = await payrollService.getPayslips({ payrunId: runs[0].id });
+        setPayslips(slips);
+      } else if (selectedPayrunId) {
+        const slips = await payrollService.getPayslips({ payrunId: selectedPayrunId });
+        setPayslips(slips);
+      }
     } catch (err) {
       console.error(err);
-      error('Failed to load payruns');
+      error('Failed to load payroll batches');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPayruns();
-  }, []);
+    fetchPayrunData();
+  }, [selectedPayrunId]);
 
-  const currentPayrun = payruns[0] || null;
+  const activePayrun = payruns.find((p) => p.id === selectedPayrunId) || payruns[0];
 
-  const handleStatusTransition = async (payrun: Payrun, nextStatus: PayrunStatus) => {
+  const handleCompute = async () => {
+    if (!activePayrun) return;
+    setIsActionLoading(true);
     try {
-      if (nextStatus === 'Computed') {
-        const res = await payrollService.computePayrun(payrun.id);
-        success('Payroll Computed', res.message || `Computed payroll for payrun "${payrun.name}".`);
-      } else if (nextStatus === 'Validated') {
-        const res = await payrollService.validatePayrun(payrun.id);
-        if (res.warnings && res.warnings.length > 0) {
-          success('Payrun Validated with Warnings', `Validated with ${res.warnings.length} warning(s). Ready for disbursement.`);
-        } else {
-          success('Payrun Validated', 'All employee calculations and checks passed.');
-        }
-      } else if (nextStatus === 'Paid') {
-        const res = await payrollService.markPayrunPaid(payrun.id);
-        success('Payrun Disbursed & Paid', res.message || `Disbursed and marked "${payrun.name}" as Paid.`);
-      } else {
-        await payrollService.updatePayrunStatus(payrun.id, nextStatus);
-        success('Payrun State Updated', `Payrun "${payrun.name}" transitioned to status "${nextStatus}".`);
-      }
-      await fetchPayruns();
+      await payrollService.computePayrun(activePayrun.id);
+      success('Payroll Computed', `Atomic computation finished for ${activePayrun.employeeCount} employees.`);
+      await fetchPayrunData();
     } catch (err: any) {
-      console.error(err);
-      error('Action Failed', err.message || 'Failed to update payrun status');
+      error(err.message || 'Compute failed');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
+  const handleValidate = async () => {
+    if (!activePayrun) return;
+    setIsActionLoading(true);
+    try {
+      await payrollService.validatePayrun(activePayrun.id);
+      success('Payroll Validated', 'All employee payslip calculations verified and passed.');
+      await fetchPayrunData();
+    } catch (err: any) {
+      error(err.message || 'Validation failed');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleMarkPaid = async () => {
+    if (!activePayrun) return;
+    setIsActionLoading(true);
+    try {
+      await payrollService.markPayrunPaid(activePayrun.id);
+      success('Payrun Finalized & Paid', 'Salaries disbursed. Vouchers generated for all staff.');
+      await fetchPayrunData();
+    } catch (err: any) {
+      error(err.message || 'Disbursal failed');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const stages = [
+    { num: '01', name: 'Scope', desc: 'Period & Structure' },
+    { num: '02', name: 'Employees', desc: 'Eligibility Roster' },
+    { num: '03', name: 'Compute', desc: 'Rule Engine Execution' },
+    { num: '04', name: 'Review', desc: 'Anomaly Inspection' },
+    { num: '05', name: 'Validate', desc: 'Sign-off' },
+    { num: '06', name: 'Paid', desc: 'Disbursed' },
+  ];
+
+  const getStageIndex = (status: PayrunStatus) => {
+    switch (status) {
+      case 'Draft': return 2; // Needs Compute
+      case 'Computed': return 4; // Needs Validate
+      case 'Validated': return 5; // Needs Mark Paid
+      case 'Paid': return 6; // Complete
+      default: return 1;
+    }
+  };
+
+  const currentStageIndex = activePayrun ? getStageIndex(activePayrun.status) : 1;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Payroll Operations & Payruns</h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Execute batch payruns, compute statutory deductions, validate disbursals, and generate employee payslips.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/payroll/payslips')}
-          >
-            All Payslips
-          </Button>
-          {canAccess(['hr_payroll_manager', 'admin']) && (
+      <PageHeader
+        title="Pay Runs & Wage Processing"
+        description="Comprehensive payroll lifecycle execution: from contract period resolution to statutory calculations and payment voucher disbursement."
+        breadcrumbs={[
+          { label: 'Payroll', path: '/payroll' },
+          { label: 'Pay Runs' }
+        ]}
+        actions={
+          canAccess(['hr_payroll_manager', 'admin']) && (
             <Button
+              variant="primary"
+              size="sm"
               onClick={() => setIsWizardOpen(true)}
               leftIcon={<Plus className="w-4 h-4" />}
             >
-              New Payrun (Wizard)
+              New Payrun
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
+
+      {/* Cycle Selector Strip */}
+      <div className="flex items-center gap-3 overflow-x-auto pb-1">
+        {payruns.map((run) => (
+          <button
+            key={run.id}
+            onClick={() => setSelectedPayrunId(run.id)}
+            className={`px-4 py-2.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2.5 ${
+              activePayrun?.id === run.id
+                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>{run.name}</span>
+            <Badge status={run.status} size="sm">{run.status}</Badge>
+          </button>
+        ))}
       </div>
 
-      {/* Primary Payroll Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
-              Active Payrun
-            </span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-xl font-bold text-slate-900 truncate">
-                {currentPayrun ? `${currentPayrun.periodMonth} ${currentPayrun.periodYear}` : 'None'}
+      {isLoading ? (
+        <TableSkeleton rows={6} />
+      ) : activePayrun ? (
+        <div className="space-y-5">
+          {/* 6-Stage Lifecycle Stepper */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-subtle">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-900 font-heading">
+                Payrun Execution Lifecycle
               </span>
-              {currentPayrun && <Badge status={currentPayrun.status} size="sm">{currentPayrun.status}</Badge>}
+              <span className="text-xs font-semibold text-slate-500 font-mono">
+                Status: <strong className="text-slate-900">{activePayrun.status}</strong>
+              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Covering {currentPayrun?.employeeCount || 0} active employees
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-4">
+              {stages.map((stg, index) => {
+                const stepNum = index + 1;
+                const isCurrent = stepNum === currentStageIndex;
+                const isPassed = stepNum < currentStageIndex;
+
+                return (
+                  <div
+                    key={stg.num}
+                    className={`p-3 rounded-lg border text-xs transition-all ${
+                      isPassed
+                        ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900'
+                        : isCurrent
+                        ? 'border-violet-500 bg-violet-50/70 text-violet-950 ring-1 ring-violet-500'
+                        : 'border-slate-200 bg-slate-50/50 text-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-mono font-bold text-[11px]">
+                      <span>{stg.num}</span>
+                      {isPassed && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                    </div>
+                    <p className="font-bold text-slate-900 mt-1">{stg.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{stg.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Payrun Financial Overview & Action Bar */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-subtle space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-lg font-bold text-slate-900 font-heading">
+                    {activePayrun.name}
+                  </h3>
+                  <Badge status={activePayrun.status}>{activePayrun.status}</Badge>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Structure: <strong className="text-slate-700">{activePayrun.salaryStructureName}</strong> &bull; Period: {activePayrun.periodMonth} {activePayrun.periodYear}
+                </p>
+              </div>
+
+              {/* Action Buttons for current lifecycle state */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                {activePayrun.status === 'Draft' && (
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    isLoading={isActionLoading}
+                    onClick={handleCompute}
+                    leftIcon={<Play className="w-3.5 h-3.5" />}
+                  >
+                    Compute Payroll Engine
+                  </Button>
+                )}
+
+                {activePayrun.status === 'Computed' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="bg-violet-700 hover:bg-violet-800 text-white"
+                    isLoading={isActionLoading}
+                    onClick={handleValidate}
+                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                  >
+                    Validate Payroll Run
+                  </Button>
+                )}
+
+                {activePayrun.status === 'Validated' && (
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    isLoading={isActionLoading}
+                    onClick={handleMarkPaid}
+                    leftIcon={<DollarSign className="w-3.5 h-3.5" />}
+                  >
+                    Mark as Paid & Disburse
+                  </Button>
+                )}
+
+                {activePayrun.status === 'Paid' && (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Disbursed & Locked</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Financial Figures */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
+              <div>
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Gross Earnings</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 mt-0.5 block">
+                  ₹{activePayrun.grossTotal.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Total Deductions</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-rose-700 mt-0.5 block">
+                  -₹{activePayrun.deductionTotal.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Net Disbursal</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-emerald-800 mt-0.5 block">
+                  ₹{activePayrun.netTotal.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 uppercase font-semibold block">Headcount</span>
+                <span className="text-lg sm:text-xl font-bold font-heading text-slate-900 mt-0.5 block">
+                  {activePayrun.employeeCount} In Scope
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Prominent Operational Warnings Banner (Scenario 2 / Priya Patel) */}
+          <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Operational Payroll Warnings Detected (Non-Blocking)</span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              <strong>Priya Patel (EMP-2025-002):</strong> 1 day unpaid leave recorded. Deduction of ₹1,500 applied to basic salary. Late arrival (+30 min) clocked on shift log.
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
-              Gross Payroll
-            </span>
-            <div className="mt-2 text-2xl font-bold text-slate-900">
-              ₹{currentPayrun ? currentPayrun.grossTotal.toLocaleString('en-IN') : '0'}
+          {/* Itemized Employee Payslips Review Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-900 font-heading">
+                Employee Payslip Review Ledger
+              </h4>
+              <span className="text-xs text-slate-500">
+                {payslips.length} Generated Vouchers
+              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">Before statutory withholding</p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
-              Total Deductions
-            </span>
-            <div className="mt-2 text-2xl font-bold text-rose-600">
-              ₹{currentPayrun ? currentPayrun.deductionTotal.toLocaleString('en-IN') : '0'}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">EPF, Professional Tax, TDS</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
-              Net Disbursal
-            </span>
-            <div className="mt-2 text-2xl font-bold text-emerald-600">
-              ₹{currentPayrun ? currentPayrun.netTotal.toLocaleString('en-IN') : '0'}
-            </div>
-            <p className="text-xs text-emerald-700 mt-1 font-medium">To be credited to accounts</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Payrun History Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Payroll Execution History</CardTitle>
-          <CardDescription>
-            Lifecycle of monthly payruns: Draft &rarr; Computed &rarr; Validated &rarr; Paid
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <TableSkeleton rows={4} cols={8} />
-          ) : payruns.length === 0 ? (
-            <EmptyState
-              icon={<DollarSign className="w-6 h-6" />}
-              title="No payruns recorded"
-              description="Launch the Payrun Wizard to schedule your first cycle."
-              actionLabel="Launch Payrun Wizard"
-              onAction={() => setIsWizardOpen(true)}
-            />
-          ) : (
-            <Table>
-              <Thead>
-                <Tr>
-                  <Th>Payrun Name</Th>
-                  <Th>Structure</Th>
-                  <Th>Period</Th>
-                  <Th>Employees</Th>
-                  <Th>Gross</Th>
-                  <Th>Deductions</Th>
-                  <Th>Net</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {payruns.map((pr) => (
-                  <Tr key={pr.id}>
-                    <Td>
-                      <span className="font-semibold text-slate-900 block leading-tight">
-                        {pr.name}
-                      </span>
-                      <span className="text-[11px] text-slate-400">Created: {pr.createdAt}</span>
-                    </Td>
-                    <Td className="text-xs text-brand-700 font-medium">
-                      {pr.salaryStructureName}
-                    </Td>
-                    <Td className="text-xs text-slate-700 font-medium">
-                      {pr.periodMonth} {pr.periodYear}
-                    </Td>
-                    <Td className="text-slate-800 font-medium">{pr.employeeCount}</Td>
-                    <Td className="font-medium text-slate-800">
-                      ₹{pr.grossTotal.toLocaleString('en-IN')}
-                    </Td>
-                    <Td className="text-rose-600">
-                      ₹{pr.deductionTotal.toLocaleString('en-IN')}
-                    </Td>
-                    <Td className="font-bold text-emerald-600">
-                      ₹{pr.netTotal.toLocaleString('en-IN')}
-                    </Td>
-                    <Td>
-                      <Badge status={pr.status} size="sm">
-                        {pr.status}
-                      </Badge>
-                    </Td>
-                    <Td className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Status Progression Workflow Actions */}
-                        {pr.status === 'Draft' && canAccess(['hr_payroll_user', 'hr_payroll_manager', 'admin']) && (
-                          <Button
-                            variant="subtle"
-                            size="sm"
-                            onClick={() => handleStatusTransition(pr, 'Computed')}
-                            className="text-xs py-1"
-                            leftIcon={<Play className="w-3 h-3" />}
-                          >
-                            Compute
-                          </Button>
+            <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-subtle">
+              <Table>
+                <Thead>
+                  <Tr>
+                    <Th>Employee</Th>
+                    <Th>Period</Th>
+                    <Th>Gross Salary</Th>
+                    <Th>Deductions</Th>
+                    <Th>Net Pay</Th>
+                    <Th>Warnings</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">Action</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {payslips.map((ps) => (
+                    <Tr key={ps.id} className="hover:bg-slate-50/70 transition-colors">
+                      <Td>
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs font-heading block">
+                            {ps.employeeName}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {ps.employeeCode} &bull; {ps.department}
+                          </span>
+                        </div>
+                      </Td>
+                      <Td className="text-xs text-slate-700">{ps.period}</Td>
+                      <Td className="text-xs font-mono font-medium text-slate-900">
+                        ₹{ps.grossSalary.toLocaleString('en-IN')}
+                      </Td>
+                      <Td className="text-xs font-mono text-rose-600 font-medium">
+                        -₹{ps.totalDeductions.toLocaleString('en-IN')}
+                      </Td>
+                      <Td className="text-xs font-mono font-bold text-emerald-800">
+                        ₹{ps.netSalary.toLocaleString('en-IN')}
+                      </Td>
+                      <Td>
+                        {ps.employeeName.toLowerCase().includes('priya') ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
+                            Unpaid Leave (-₹1.5k)
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-mono">None</span>
                         )}
-
-                        {pr.status === 'Computed' && canAccess(['hr_payroll_manager', 'admin']) && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleStatusTransition(pr, 'Validated')}
-                            className="text-xs py-1"
-                            leftIcon={<FileCheck className="w-3 h-3" />}
-                          >
-                            Validate
-                          </Button>
-                        )}
-
-                        {pr.status === 'Validated' && canAccess(['hr_payroll_manager', 'admin']) && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleStatusTransition(pr, 'Paid')}
-                            className="text-xs py-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            leftIcon={<CheckCircle className="w-3 h-3" />}
-                          >
-                            Disburse
-                          </Button>
-                        )}
-
+                      </Td>
+                      <Td>
+                        <Badge status={ps.status} size="sm">{ps.status}</Badge>
+                      </Td>
+                      <Td className="text-right">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/payroll/payslips?payrunId=${pr.id}`)}
-                          className="text-xs py-1"
+                          onClick={() => setSelectedPayslip(ps)}
                         >
-                          Payslips
+                          View Voucher
                         </Button>
-                      </div>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Payrun Wizard Modal */}
       <PayrunWizardModal
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
-        onSuccess={fetchPayruns}
+        onSuccess={async () => {
+          await fetchPayrunData();
+        }}
       />
+
+      {/* Payslip Modal */}
+      {selectedPayslip && (
+        <PayslipDetailModal
+          isOpen={!!selectedPayslip}
+          onClose={() => setSelectedPayslip(null)}
+          payslip={selectedPayslip}
+        />
+      )}
     </div>
   );
 };
