@@ -1,0 +1,26 @@
+{
+  "name": "peoplepay360-backend",
+  "version": "1.0.0",
+  "description": "PeoplePay360: Integrated HR & Payroll Platform Backend",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:demo": "tsx tests/demo-scenarios.test.ts",
+    "verify": "tsx scripts/verify-supabase.ts",
+    "seed:users": "tsx scripts/seed-users.ts",
+    "test:rls": "tsx scripts/test-rls.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7"
+  }
+}
