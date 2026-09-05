@@ -970,12 +970,12 @@ USING (employee_id = public.auth_employee_id() OR public.auth_user_role() IN ('a
 DROP POLICY IF EXISTS "Employees can clock in/out for themselves" ON public.attendance;
 CREATE POLICY "Employees can clock in/out for themselves"
 ON public.attendance FOR INSERT
-WITH CHECK (employee_id = public.auth_employee_id() OR public.auth_user_role() IN ('admin', 'hr_manager'));
+WITH CHECK (employee_id = public.auth_employee_id() OR public.auth_user_role() IN ('admin', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager'));
 
 DROP POLICY IF EXISTS "Attendance updateable by employee or HR/Admin" ON public.attendance;
 CREATE POLICY "Attendance updateable by employee or HR/Admin"
 ON public.attendance FOR UPDATE
-USING ((employee_id = public.auth_employee_id() AND attendance_date = CURRENT_DATE) OR public.auth_user_role() IN ('admin', 'hr_manager'));
+USING ((employee_id = public.auth_employee_id() AND attendance_date = CURRENT_DATE) OR public.auth_user_role() IN ('admin', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager'));
 
 -- Salary Structure & Rules Policies
 DROP POLICY IF EXISTS "Salary structures viewable by HR/Payroll/Admin" ON public.salary_structures;
@@ -1102,9 +1102,13 @@ VALUES
     ('55555555-5555-5555-5555-444444444444', 'Unpaid Leave (LWP)', 'LWP', false, 0.0, true)
 ON CONFLICT (id) DO NOTHING;
 
--- 6. Employees (Rahul, Priya, Vikram, Ananya, Amit)
+-- 6. Employees (System Admin, HR Manager, HR Payroll User/Manager, Rahul, Priya, Vikram, Ananya, Amit)
 INSERT INTO public.employees (id, employee_code, first_name, last_name, email, phone, date_of_birth, joining_date, department_id, job_position, employee_type, status, bank_account_number, bank_name, bank_ifsc_or_routing)
 VALUES
+    ('aaaa0000-0000-0000-0000-000000000001', 'EMP-ADM01', 'System', 'Administrator', 'admin@peoplepay360.com', '+91 9876543200', '1985-01-01', '2023-01-01', '22222222-2222-2222-2222-444444444444', 'System Administrator', 'full_time', 'active', 'HDFC00000000001', 'HDFC Bank', 'HDFC0001001'),
+    ('aaaa0000-0000-0000-0000-000000000002', 'EMP-HRM01', 'Sunita', 'Rao', 'hr.manager@peoplepay360.com', '+91 9876543201', '1988-06-15', '2023-03-01', '22222222-2222-2222-2222-222222222222', 'HR Manager', 'full_time', 'active', 'ICIC00000000002', 'ICICI Bank', 'ICIC0001002'),
+    ('aaaa0000-0000-0000-0000-000000000003', 'EMP-PAY01', 'Karthik', 'Raj', 'payroll.user@peoplepay360.com', '+91 9876543202', '1993-09-10', '2024-01-15', '22222222-2222-2222-2222-333333333333', 'HR Payroll User', 'full_time', 'active', 'SBIN00000000003', 'State Bank of India', 'SBIN0001003'),
+    ('aaaa0000-0000-0000-0000-000000000004', 'EMP-PAY02', 'Priya', 'Sharma', 'payroll.manager@peoplepay360.com', '+91 9876543203', '1989-11-20', '2023-05-01', '22222222-2222-2222-2222-222222222222', 'HR Payroll Manager', 'full_time', 'active', 'UTIB00000000004', 'Axis Bank', 'UTIB0001004'),
     ('aaaa1111-1111-1111-1111-111111111111', 'EMP001', 'Rahul', 'Sharma', 'rahul@peoplepay360.com', '+91 9876543210', '1992-05-14', '2025-01-01', '22222222-2222-2222-2222-111111111111', 'Software Engineer', 'full_time', 'active', 'HDFC00012345678', 'HDFC Bank', 'HDFC0001234'),
     ('aaaa2222-2222-2222-2222-222222222222', 'EMP002', 'Priya', 'Patel', 'priya@peoplepay360.com', '+91 9876543211', '1995-08-22', '2025-01-15', '22222222-2222-2222-2222-111111111111', 'Frontend Developer', 'full_time', 'active', 'ICIC00098765432', 'ICICI Bank', 'ICIC0009876'),
     ('aaaa3333-3333-3333-3333-333333333333', 'EMP003', 'Vikram', 'Singh', 'vikram@peoplepay360.com', '+91 9876543212', '1988-11-03', '2024-03-01', '22222222-2222-2222-2222-111111111111', 'Tech Lead', 'full_time', 'active', 'SBIN00045678901', 'State Bank of India', 'SBIN0004567'),

@@ -94,6 +94,7 @@ function mapDbToAttendance(dbAtt: any): AttendanceRecord {
 }
 
 function matchesEmployeeId(recordEmpId: string, queryEmpId: string): boolean {
+  if (!recordEmpId || !queryEmpId) return false;
   if (recordEmpId === queryEmpId) return true;
   if (queryEmpId === 'aaaa1111-1111-1111-1111-111111111111' && recordEmpId === 'emp-1') return true;
   if (queryEmpId === 'emp-1' && recordEmpId === 'aaaa1111-1111-1111-1111-111111111111') return true;
@@ -127,14 +128,30 @@ export function generateDeterministic365Attendance(
   let dept: string = department || '';
 
   if (!empName || empName === 'Staff Member') {
-    if (employeeId.includes('1111') || employeeId === 'emp-1') {
+    if (employeeId.includes('0001') || employeeId === 'aaaa0000-0000-0000-0000-000000000001') {
+      empName = 'System Administrator';
+      empCode = 'EMP-0001';
+      dept = 'Operations';
+    } else if (employeeId.includes('0002') || employeeId === 'aaaa0000-0000-0000-0000-000000000002') {
+      empName = 'Sunita Rao';
+      empCode = 'EMP-0002';
+      dept = 'Human Resources';
+    } else if (employeeId.includes('0003') || employeeId === 'aaaa0000-0000-0000-0000-000000000003') {
+      empName = 'Karthik Raj';
+      empCode = 'EMP-0003';
+      dept = 'Finance';
+    } else if (employeeId.includes('0004') || employeeId === 'aaaa0000-0000-0000-0000-000000000004') {
+      empName = 'Priya Sharma';
+      empCode = 'EMP-0004';
+      dept = 'Human Resources';
+    } else if (employeeId.includes('1111') || employeeId === 'emp-1') {
       empName = 'Rahul Sharma';
       empCode = 'EMP-1001';
       dept = 'Engineering';
     } else if (employeeId.includes('2222') || employeeId === 'emp-2') {
-      empName = 'Priya Sharma';
+      empName = 'Priya Patel';
       empCode = 'EMP-1002';
-      dept = 'Human Resources';
+      dept = 'Engineering';
     } else if (employeeId.includes('3333') || employeeId === 'emp-3') {
       empName = 'Arjun Patel';
       empCode = 'EMP-1003';
@@ -310,6 +327,8 @@ export const attendanceService = {
     department?: string;
     status?: string;
     employeeId?: string;
+    employeeName?: string;
+    employeeCode?: string;
   }): Promise<AttendanceRecord[]> => {
     // 1. Gather all real records from Supabase and local store
     const realRecords: AttendanceRecord[] = [];
@@ -345,8 +364,8 @@ export const attendanceService = {
     const targetEmployeeId = filters?.employeeId || 'aaaa1111-1111-1111-1111-111111111111';
     let records = generateDeterministic365Attendance(
       targetEmployeeId,
-      undefined,
-      undefined,
+      filters?.employeeName,
+      filters?.employeeCode,
       filters?.department !== 'All' ? filters?.department : undefined,
       realRecords
     );
@@ -396,8 +415,8 @@ export const attendanceService = {
 
   checkIn: async (
     employeeId: string,
-    employeeName: string = 'Rahul Sharma',
-    department: string = 'Engineering'
+    employeeName?: string,
+    department?: string
   ): Promise<AttendanceRecord> => {
     const today = getLocalDateString();
 
@@ -417,6 +436,41 @@ export const attendanceService = {
     const minutes = now.getMinutes();
     if (hours > 9 || (hours === 9 && minutes > 30)) {
       status = 'Late';
+    }
+
+    // Resolve accurate employee name, code, dept
+    let resolvedName = employeeName;
+    let resolvedCode = 'EMP-1001';
+    let resolvedDept = department;
+
+    if (employeeId === 'aaaa0000-0000-0000-0000-000000000001') {
+      resolvedName = resolvedName || 'System Administrator';
+      resolvedCode = 'EMP-0001';
+      resolvedDept = resolvedDept || 'Operations';
+    } else if (employeeId === 'aaaa0000-0000-0000-0000-000000000002') {
+      resolvedName = resolvedName || 'Sunita Rao';
+      resolvedCode = 'EMP-0002';
+      resolvedDept = resolvedDept || 'Human Resources';
+    } else if (employeeId === 'aaaa0000-0000-0000-0000-000000000003') {
+      resolvedName = resolvedName || 'Karthik Raj';
+      resolvedCode = 'EMP-0003';
+      resolvedDept = resolvedDept || 'Finance';
+    } else if (employeeId === 'aaaa0000-0000-0000-0000-000000000004') {
+      resolvedName = resolvedName || 'Priya Sharma';
+      resolvedCode = 'EMP-0004';
+      resolvedDept = resolvedDept || 'Human Resources';
+    } else if (employeeId.includes('1111') || employeeId === 'emp-1') {
+      resolvedName = resolvedName || 'Rahul Sharma';
+      resolvedCode = 'EMP-1001';
+      resolvedDept = resolvedDept || 'Engineering';
+    } else if (employeeId.includes('2222') || employeeId === 'emp-2') {
+      resolvedName = resolvedName || 'Priya Patel';
+      resolvedCode = 'EMP-1002';
+      resolvedDept = resolvedDept || 'Engineering';
+    } else {
+      resolvedName = resolvedName || 'Staff Member';
+      resolvedCode = 'EMP-1099';
+      resolvedDept = resolvedDept || 'Operations';
     }
 
     // 2. Insert into Supabase if connected
@@ -454,9 +508,9 @@ export const attendanceService = {
     const newRecord: AttendanceRecord = {
       id: existing ? existing.id : `att-${Date.now()}`,
       employeeId,
-      employeeName,
-      employeeCode: employeeId.includes('2') ? 'EMP-1002' : 'EMP-1001',
-      department,
+      employeeName: resolvedName,
+      employeeCode: resolvedCode,
+      department: resolvedDept,
       date: today,
       checkIn: checkInFormatted,
       checkOut: '--:--',

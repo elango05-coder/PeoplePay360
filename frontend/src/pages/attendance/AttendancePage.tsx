@@ -74,15 +74,32 @@ export const AttendancePage: React.FC = () => {
     day: 'numeric'
   });
 
-  const empId = user?.employeeId || (role === 'employee' ? 'aaaa1111-1111-1111-1111-111111111111' : undefined);
+  // View scope for administrative users: 'my' (self-service attendance) vs 'all' (company-wide attendance)
+  const [viewScope, setViewScope] = useState<'my' | 'all'>('my');
+
+  // Resolve current authenticated user's employee identity
+  const empId = user?.employeeId || (
+    role === 'admin' ? 'aaaa0000-0000-0000-0000-000000000001' :
+    role === 'hr_manager' ? 'aaaa0000-0000-0000-0000-000000000002' :
+    role === 'hr_payroll_user' ? 'aaaa0000-0000-0000-0000-000000000003' :
+    role === 'hr_payroll_manager' ? 'aaaa0000-0000-0000-0000-000000000004' :
+    role === 'employee' ? 'aaaa1111-1111-1111-1111-111111111111' :
+    undefined
+  );
 
   const fetchAttendance = async () => {
     setIsLoading(true);
     try {
-      const isEmployeeRole = role === 'employee';
+      const isSelfView = viewScope === 'my' || role === 'employee';
       const [list, stats, todayRec] = await Promise.all([
-        attendanceService.getAttendanceRecords(isEmployeeRole && empId ? { employeeId: empId } : undefined),
-        attendanceService.getAttendanceMetrics(isEmployeeRole && empId ? { employeeId: empId } : undefined),
+        attendanceService.getAttendanceRecords(
+          isSelfView && empId
+            ? { employeeId: empId, employeeName: user?.name }
+            : undefined
+        ),
+        attendanceService.getAttendanceMetrics(
+          isSelfView && empId ? { employeeId: empId } : undefined
+        ),
         empId ? attendanceService.getTodayAttendance(empId, todayStr) : Promise.resolve(null)
       ]);
       setRecords(list);
@@ -98,7 +115,7 @@ export const AttendancePage: React.FC = () => {
 
   useEffect(() => {
     fetchAttendance();
-  }, [role, user]);
+  }, [role, user, viewScope]);
 
   const isCheckedInToday = Boolean(
     todayRecord && todayRecord.checkIn && todayRecord.checkIn !== '--:--'
@@ -110,7 +127,7 @@ export const AttendancePage: React.FC = () => {
 
   const handleCheckIn = async () => {
     if (!empId) {
-      error('Check-In Error', 'Employee profile could not be found.');
+      error('Check-In Error', 'Unable to identify your employee profile.');
       return;
     }
     setIsPunching(true);
@@ -120,7 +137,7 @@ export const AttendancePage: React.FC = () => {
       success('Check-In Recorded', `Your shift check-in was logged at ${rec.checkIn}.`);
       await fetchAttendance();
     } catch (err: any) {
-      error('Check-In Error', err?.message || 'Unable to record check-in. Please try again.');
+      error('Check-In Error', err?.message || 'Unable to save attendance. Please try again.');
     } finally {
       setIsPunching(false);
     }
@@ -128,7 +145,7 @@ export const AttendancePage: React.FC = () => {
 
   const handleCheckOut = async () => {
     if (!empId) {
-      error('Check-Out Error', 'Employee profile could not be found.');
+      error('Check-Out Error', 'Unable to identify your employee profile.');
       return;
     }
     setIsPunching(true);
@@ -138,7 +155,7 @@ export const AttendancePage: React.FC = () => {
       success('Check-Out Recorded', `Your shift check-out was logged at ${rec.checkOut}.`);
       await fetchAttendance();
     } catch (err: any) {
-      error('Check-Out Error', err?.message || 'Unable to record check-out. Please try again.');
+      error('Check-Out Error', err?.message || 'Unable to save attendance. Please try again.');
     } finally {
       setIsPunching(false);
     }
@@ -347,6 +364,34 @@ export const AttendancePage: React.FC = () => {
       {/* Filter & View Range Bar */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-subtle">
         <div className="flex items-center flex-wrap gap-2">
+          {/* Scope Selector for Administrative Staff */}
+          {canAccess(['hr_manager', 'admin', 'hr_payroll_manager', 'hr_payroll_user']) && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs mr-1">
+              <button
+                type="button"
+                onClick={() => setViewScope('my')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'my'
+                    ? 'bg-[#8b008b] text-white shadow-xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                My Attendance
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewScope('all')}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  viewScope === 'all'
+                    ? 'bg-[#8b008b] text-white shadow-xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Organization Records
+              </button>
+            </div>
+          )}
+
           {/* Time Range Selector */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             <button

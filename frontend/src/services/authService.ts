@@ -72,15 +72,17 @@ export const authService = {
 
         if (!error && profile) {
           const emp = profile.employee as any;
-          const deptName = emp?.department?.name || 'Operations';
           const userRole = normalizeRole(profile.role);
+          const matched = MOCK_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
+          const deptName = emp?.department?.name || matched?.department || 'Operations';
+          const resolvedEmpId = profile.employee_id || matched?.employeeId || undefined;
 
           const userObj: User = {
             id: profile.id,
             email: profile.email || cleanEmail,
-            name: profile.full_name || cleanEmail.split('@')[0],
+            name: profile.full_name || matched?.name || cleanEmail.split('@')[0],
             role: userRole,
-            employeeId: profile.employee_id || undefined,
+            employeeId: resolvedEmpId,
             department: deptName,
           };
 

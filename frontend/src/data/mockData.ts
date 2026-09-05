@@ -16,6 +16,7 @@ export const MOCK_USERS: User[] = [
     email: 'admin@peoplepay360.com',
     name: 'System Administrator',
     role: 'admin',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000001',
     department: 'Operations'
   },
   {
@@ -23,6 +24,7 @@ export const MOCK_USERS: User[] = [
     email: 'hr.manager@peoplepay360.com',
     name: 'Sunita Rao',
     role: 'hr_manager',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000002',
     department: 'Human Resources'
   },
   {
@@ -30,6 +32,7 @@ export const MOCK_USERS: User[] = [
     email: 'payroll.manager@peoplepay360.com',
     name: 'Priya Sharma',
     role: 'hr_payroll_manager',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000004',
     department: 'Human Resources'
   },
   {
@@ -37,6 +40,7 @@ export const MOCK_USERS: User[] = [
     email: 'payroll.user@peoplepay360.com',
     name: 'Karthik Raj',
     role: 'hr_payroll_user',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000003',
     department: 'Finance'
   },
   {
@@ -63,6 +67,7 @@ export const MOCK_USERS: User[] = [
     email: 'manager@peoplepay360.com',
     name: 'Priya Sharma',
     role: 'hr_payroll_manager',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000004',
     department: 'Human Resources'
   },
   {
@@ -70,6 +75,7 @@ export const MOCK_USERS: User[] = [
     email: 'payroll@peoplepay360.com',
     name: 'Karthik Raj',
     role: 'hr_payroll_user',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000003',
     department: 'Finance'
   },
   {
@@ -77,11 +83,76 @@ export const MOCK_USERS: User[] = [
     email: 'hr@peoplepay360.com',
     name: 'Sunita Rao',
     role: 'hr_manager',
+    employeeId: 'aaaa0000-0000-0000-0000-000000000002',
     department: 'Human Resources'
   }
 ];
 
 export const MOCK_EMPLOYEES: Employee[] = [
+  {
+    id: 'aaaa0000-0000-0000-0000-000000000001',
+    code: 'EMP-0001',
+    firstName: 'System',
+    lastName: 'Administrator',
+    email: 'admin@peoplepay360.com',
+    phone: '+91 98765 43200',
+    dob: '1985-01-01',
+    joiningDate: '2023-01-01',
+    department: 'Operations',
+    position: 'System Administrator',
+    employeeType: 'Full-Time',
+    status: 'Active',
+    workingSchedule: 'Standard General Shift (9:00 AM - 6:00 PM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'aaaa0000-0000-0000-0000-000000000002',
+    code: 'EMP-0002',
+    firstName: 'Sunita',
+    lastName: 'Rao',
+    email: 'hr.manager@peoplepay360.com',
+    phone: '+91 98765 43201',
+    dob: '1988-06-15',
+    joiningDate: '2023-03-01',
+    department: 'Human Resources',
+    position: 'HR Manager',
+    employeeType: 'Full-Time',
+    status: 'Active',
+    workingSchedule: 'Standard General Shift (9:00 AM - 6:00 PM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'aaaa0000-0000-0000-0000-000000000003',
+    code: 'EMP-0003',
+    firstName: 'Karthik',
+    lastName: 'Raj',
+    email: 'payroll.user@peoplepay360.com',
+    phone: '+91 98765 43202',
+    dob: '1993-09-10',
+    joiningDate: '2024-01-15',
+    department: 'Finance',
+    position: 'HR Payroll User',
+    employeeType: 'Full-Time',
+    status: 'Active',
+    workingSchedule: 'Standard General Shift (9:00 AM - 6:00 PM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
+  },
+  {
+    id: 'aaaa0000-0000-0000-0000-000000000004',
+    code: 'EMP-0004',
+    firstName: 'Priya',
+    lastName: 'Sharma',
+    email: 'payroll.manager@peoplepay360.com',
+    phone: '+91 98765 43203',
+    dob: '1989-11-20',
+    joiningDate: '2023-05-01',
+    department: 'Human Resources',
+    position: 'HR Payroll Manager',
+    employeeType: 'Full-Time',
+    status: 'Active',
+    workingSchedule: 'Standard General Shift (9:00 AM - 6:00 PM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80'
+  },
   {
     id: 'emp-1',
     code: 'EMP-1001',
