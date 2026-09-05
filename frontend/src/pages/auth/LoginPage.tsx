@@ -1,57 +1,90 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardContent } from '../../components/ui/Card';
+import { getDashboardPath } from '../../services/authService';
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: sessionLoading, role } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState('admin@peoplepay360.com');
   const [password, setPassword] = useState('Password123!');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
+  // If already authenticated and session loaded, redirect immediately to role dashboard
+  useEffect(() => {
+    if (!sessionLoading && isAuthenticated) {
+      const fromPath = (location.state as any)?.from?.pathname;
+      const target = fromPath && fromPath !== '/login' ? fromPath : getDashboardPath(role);
+      navigate(target, { replace: true });
+    }
+  }, [isAuthenticated, sessionLoading, role, navigate, location]);
+
   const demoAccounts = [
-    { role: 'Administrator', email: 'admin@peoplepay360.com', desc: 'Full System & Users' },
-    { role: 'HR Manager', email: 'hr.manager@peoplepay360.com', desc: 'Staff, Attendance, Leave' },
-    { role: 'Payroll Manager', email: 'payroll.manager@peoplepay360.com', desc: 'Payruns, Structures, Review' },
-    { role: 'Payroll Operator', email: 'payroll.user@peoplepay360.com', desc: 'Compute & Run Payroll' },
-    { role: 'Employee (Rahul)', email: 'rahul@peoplepay360.com', desc: 'Self-Service & Payslips' },
+    { role: 'Administrator', email: 'admin@peoplepay360.com', desc: 'Full System, Admin Dashboard & Users' },
+    { role: 'HR Manager', email: 'hr.manager@peoplepay360.com', desc: 'Staff Directory, Attendance & Time-off' },
+    { role: 'HR Payroll Manager', email: 'payroll.manager@peoplepay360.com', desc: 'Payroll Runs, Structures & Payslips' },
+    { role: 'Employee (Rahul)', email: 'rahul@peoplepay360.com', desc: 'Employee Self-Service, Attendance & Leaves' },
+    { role: 'Employee (Priya)', email: 'priya@peoplepay360.com', desc: 'Employee Self-Service (Data Isolation Test)' },
   ];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    if (!email.trim()) {
       setFormError('Please enter your corporate email address');
+      return;
+    }
+    if (!password) {
+      setFormError('Please enter your password');
       return;
     }
 
     setFormError('');
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
-      await login(email, password);
-      success('Welcome to PeoplePay360', 'Signed in successfully');
-      navigate('/dashboard');
+      const authUser = await login(email, password);
+      success('Welcome to PeoplePay360', `Signed in as ${authUser.name}`);
+      
+      const roleDashboard = getDashboardPath(authUser.role);
+      navigate(roleDashboard, { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Invalid credentials provided';
+      const msg = err instanceof Error ? err.message : 'Invalid email or password.';
       setFormError(msg);
       error('Authentication Failed', msg);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const selectDemoAccount = (demoEmail: string) => {
     setEmail(demoEmail);
     setPassword('Password123!');
+    setFormError('');
   };
+
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-violet-600 to-emerald-500 flex items-center justify-center text-white shadow-lg animate-pulse">
+            <span className="font-bold text-xl">P</span>
+          </div>
+          <p className="text-sm font-semibold text-slate-300 tracking-wide">
+            Loading session...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-950 via-slate-900 to-emerald-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
@@ -103,7 +136,7 @@ export const LoginPage: React.FC = () => {
                   type="submit"
                   variant="primary"
                   className="w-full justify-center bg-violet-700 hover:bg-violet-800 text-white py-2.5 font-medium shadow-sm"
-                  isLoading={isLoading}
+                  isLoading={isSubmitting}
                   rightIcon={<ArrowRight className="w-4 h-4" />}
                 >
                   Sign In to Workspace
@@ -115,7 +148,7 @@ export const LoginPage: React.FC = () => {
             <div className="mt-6 pt-5 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  1-Click Evaluation Personas
+                  Select Role Persona
                 </span>
                 <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
                   Password123!
@@ -140,7 +173,7 @@ export const LoginPage: React.FC = () => {
                     {email === acc.email ? (
                       <CheckCircle2 className="w-4 h-4 text-violet-600 shrink-0" />
                     ) : (
-                      <span className="text-[11px] text-slate-400 font-mono">Fill</span>
+                      <span className="text-[11px] text-slate-400 font-mono">Select</span>
                     )}
                   </button>
                 ))}

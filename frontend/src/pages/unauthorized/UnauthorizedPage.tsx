@@ -1,29 +1,37 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Home } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 
 export const UnauthorizedPage: React.FC = () => {
   const navigate = useNavigate();
-  const { role, switchRole } = useAuth();
+  const location = useLocation();
+  const { role, getRoleDashboardUrl } = useAuth();
+  const attemptedUrl = (location.state as any)?.attemptedUrl;
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
-      <div className="max-w-md w-full text-center space-y-5 bg-white p-8 rounded-2xl border border-slate-200 shadow-xl">
-        <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+      <div className="max-w-md w-full text-center space-y-5 bg-white p-8 rounded-2xl border border-slate-200/80 shadow-card">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
           <ShieldAlert className="w-8 h-8" />
         </div>
 
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Access Restricted</h2>
-          <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-            Your current persona (<strong className="capitalize">{role.replace(/_/g, ' ')}</strong>) does not have sufficient role privileges to view this module.
+          <h2 className="text-xl font-bold text-slate-900 font-heading">
+            Access Restricted
+          </h2>
+          <p className="mt-2 text-sm text-slate-600 font-medium leading-relaxed">
+            You don't have permission to access this page.
           </p>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
-          Tip: In this hackathon demo, you can easily switch to <strong>Admin</strong> or <strong>Payroll Manager</strong> using the Role Switcher in the top bar to preview this module.
+          {attemptedUrl && (
+            <p className="text-xs text-slate-400 font-mono mt-1">
+              Attempted path: {attemptedUrl}
+            </p>
+          )}
+          <p className="text-xs text-slate-500 mt-2">
+            Your authenticated role is <strong className="capitalize text-slate-800 font-semibold">{role.replace(/_/g, ' ')}</strong>.
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -38,10 +46,10 @@ export const UnauthorizedPage: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(getRoleDashboardUrl())}
             leftIcon={<Home className="w-4 h-4" />}
           >
-            Return to Dashboard
+            Go to Your Dashboard
           </Button>
         </div>
       </div>

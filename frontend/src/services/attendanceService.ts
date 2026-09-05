@@ -93,7 +93,14 @@ export const attendanceService = {
     // Fallback to local / mock
     let list = [...MOCK_ATTENDANCE];
     if (filters?.employeeId) {
-      list = list.filter((r) => r.employeeId === filters.employeeId);
+      const empId = filters.employeeId;
+      list = list.filter((r) =>
+        r.employeeId === empId ||
+        (empId === 'aaaa1111-1111-1111-1111-111111111111' && r.employeeId === 'emp-1') ||
+        (empId === 'emp-1' && r.employeeId === 'aaaa1111-1111-1111-1111-111111111111') ||
+        (empId === 'aaaa2222-2222-2222-2222-222222222222' && r.employeeId === 'emp-2') ||
+        (empId === 'emp-2' && r.employeeId === 'aaaa2222-2222-2222-2222-222222222222')
+      );
     }
     if (filters?.date) {
       list = list.filter((r) => r.date === filters.date);
@@ -107,8 +114,8 @@ export const attendanceService = {
     return list;
   },
 
-  getAttendanceMetrics: async (date?: string) => {
-    const records = await attendanceService.getAttendanceRecords({ date });
+  getAttendanceMetrics: async (params?: { date?: string; employeeId?: string }) => {
+    const records = await attendanceService.getAttendanceRecords(params);
     const present = records.filter((r) => r.status === 'Present' || r.status === 'Overtime' || r.status === 'Corrected').length;
     const late = records.filter((r) => r.status === 'Late').length;
     const absent = records.filter((r) => r.status === 'Absent').length;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
-import { authService } from '../services/authService';
+import { authService, normalizeRole, getDashboardPath } from '../services/authService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
@@ -8,10 +8,11 @@ interface AuthContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<User>;
   logout: () => Promise<void>;
-  switchRole: (newRole: UserRole) => void;
+  switchRole: (newRole: UserRole) => User;
   canAccess: (allowedRoles: UserRole[]) => boolean;
+  getRoleDashboardUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,7 +24,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let mounted = true;
 
-    async function initAuth() {
+    async function initSession() {
       try {
         if (isSupabaseConfigured && supabase) {
           const { data: sessionData } = await supabase.auth.getSession();
@@ -32,32 +33,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               sessionData.session.user.id,
               sessionData.session.user.email || ''
             );
-            setUser(profile);
+            if (mounted) setUser(profile);
           } else {
-            setUser(authService.getCurrentUser());
+            const stored = authService.getCurrentUser();
+            if (mounted) setUser(stored);
           }
         } else {
-          setUser(authService.getCurrentUser());
+          const stored = authService.getCurrentUser();
+          if (mounted) setUser(stored);
         }
       } catch (err) {
-        console.error('Session init error:', err);
-        if (mounted) setUser(authService.getCurrentUser());
+        console.warn('Session restoration exception:', err);
+        if (mounted) {
+          const stored = authService.getCurrentUser();
+          setUser(stored);
+        }
       } finally {
         if (mounted) setIsLoading(false);
       }
     }
 
-    initAuth();
+    initSession();
 
-    // Listen to Supabase auth events
+    // Listen to Supabase auth events (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED)
     if (isSupabaseConfigured && supabase) {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const profile = await authService.fetchProfileForUser(
-            session.user.id,
-            session.user.email || ''
-          );
-          if (mounted) setUser(profile);
+        if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event) && session?.user) {
+          try {
+            const profile = await authService.fetchProfileForUser(
+              session.user.id,
+              session.user.email || ''
+            );
+            if (mounted) setUser(profile);
+          } catch (e) {
+            console.warn('Auth event profile refresh error:', e);
+          }
         } else if (event === 'SIGNED_OUT') {
           if (mounted) setUser(null);
         }
@@ -74,27 +84,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = async (email: string, password: string = 'Password123!') => {
-    const loggedInUser = await authService.login(email, password);
-    setUser(loggedInUser);
+  const login = async (email: string, password: string = 'Password123!'): Promise<User> => {
+    setIsLoading(true);
+    try {
+      const loggedInUser = await authService.login(email, password);
+      setUser(loggedInUser);
+      return loggedInUser;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     await authService.logout();
     setUser(null);
   };
 
-  const switchRole = (newRole: UserRole) => {
+  const switchRole = (newRole: UserRole): User => {
     const updated = authService.switchRole(newRole);
     setUser(updated);
+    return updated;
   };
 
-  const role: UserRole = user?.role || 'employee';
+  const role: UserRole = user?.role ? normalizeRole(user.role) : 'employee';
 
   const canAccess = (allowedRoles: UserRole[]): boolean => {
     if (!user) return false;
-    if (user.role === 'admin') return true; // Admin has full access
-    return allowedRoles.includes(user.role);
+    const current = normalizeRole(user.role);
+    if (current === 'admin') return true; // Admin has full platform access
+    return allowedRoles.map(normalizeRole).includes(current);
+  };
+
+  const getRoleDashboardUrl = (): string => {
+    return getDashboardPath(role);
   };
 
   return (
@@ -107,7 +129,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         logout,
         switchRole,
-        canAccess
+        canAccess,
+        getRoleDashboardUrl
       }}
     >
       {children}
@@ -122,3 +145,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+export { getDashboardPath };

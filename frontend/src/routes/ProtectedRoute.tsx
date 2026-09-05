@@ -1,16 +1,14 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../types';
 import { Loader2 } from 'lucide-react';
 
-interface RoleGuardProps {
-  children: React.ReactNode;
-  allowedRoles: UserRole[];
+interface ProtectedRouteProps {
+  children?: React.ReactNode;
 }
 
-export const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) => {
-  const { canAccess, isAuthenticated, isLoading } = useAuth();
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -32,9 +30,5 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ children, allowedRoles }) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!canAccess(allowedRoles)) {
-    return <Navigate to="/unauthorized" state={{ attemptedUrl: location.pathname }} replace />;
-  }
-
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };

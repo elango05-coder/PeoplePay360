@@ -345,7 +345,14 @@ export const payrollService = {
       list = list.filter((ps) => ps.payrunId === filters.payrunId);
     }
     if (filters?.employeeId) {
-      list = list.filter((ps) => ps.employeeId === filters.employeeId);
+      const empId = filters.employeeId;
+      list = list.filter((ps) =>
+        ps.employeeId === empId ||
+        (empId === 'aaaa1111-1111-1111-1111-111111111111' && ps.employeeId === 'emp-1') ||
+        (empId === 'emp-1' && ps.employeeId === 'aaaa1111-1111-1111-1111-111111111111') ||
+        (empId === 'aaaa2222-2222-2222-2222-222222222222' && ps.employeeId === 'emp-2') ||
+        (empId === 'emp-2' && ps.employeeId === 'aaaa2222-2222-2222-2222-222222222222')
+      );
     }
     if (filters?.search) {
       const q = filters.search.toLowerCase().trim();

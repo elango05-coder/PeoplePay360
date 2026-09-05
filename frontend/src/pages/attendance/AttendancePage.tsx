@@ -29,7 +29,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 export const AttendancePage: React.FC = () => {
-  const { user, canAccess } = useAuth();
+  const { user, role, canAccess } = useAuth();
   const { success, error } = useToast();
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -66,9 +66,10 @@ export const AttendancePage: React.FC = () => {
   const fetchAttendance = async () => {
     setIsLoading(true);
     try {
+      const empId = role === 'employee' ? user?.employeeId : undefined;
       const [list, stats] = await Promise.all([
-        attendanceService.getAttendanceRecords(),
-        attendanceService.getAttendanceMetrics()
+        attendanceService.getAttendanceRecords(empId ? { employeeId: empId } : undefined),
+        attendanceService.getAttendanceMetrics(empId ? { employeeId: empId } : undefined)
       ]);
       setRecords(list);
       setMetrics(stats);
@@ -82,7 +83,7 @@ export const AttendancePage: React.FC = () => {
 
   useEffect(() => {
     fetchAttendance();
-  }, []);
+  }, [role, user]);
 
   const handlePunchToggle = async () => {
     try {

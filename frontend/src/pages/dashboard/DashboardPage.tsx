@@ -24,11 +24,16 @@ import { contractService } from '../../services/contractService';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Employee, Payrun, TimeOffRequest, Contract, AttendanceRecord } from '../../types';
+import { Employee, Payrun, TimeOffRequest, Contract, AttendanceRecord, UserRole } from '../../types';
 
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  forcedRole?: UserRole;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({ forcedRole }) => {
   const { user, role, canAccess } = useAuth();
   const navigate = useNavigate();
+  const effectiveRole = forcedRole || role;
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payruns, setPayruns] = useState<Payrun[]>([]);
@@ -48,20 +53,30 @@ export const DashboardPage: React.FC = () => {
     async function loadDashboardData() {
       setIsLoading(true);
       try {
-        const [empList, prList, leaves, attMetrics, cntList, attRecords] = await Promise.all([
-          employeeService.getEmployees(),
-          payrollService.getPayruns(),
-          timeOffService.getTimeOffRequests(),
-          attendanceService.getAttendanceMetrics(),
-          contractService.getContracts(),
-          attendanceService.getAttendanceRecords()
-        ]);
-        setEmployees(empList);
-        setPayruns(prList);
-        setLeaveRequests(leaves);
-        setAttendanceStats(attMetrics);
-        setContracts(cntList);
-        setAttendanceRecords(attRecords);
+        if (effectiveRole === 'employee') {
+          const empId = user?.employeeId;
+          const [leaves, attRecords] = await Promise.all([
+            timeOffService.getTimeOffRequests(empId ? { employeeId: empId } : undefined),
+            attendanceService.getAttendanceRecords(empId ? { employeeId: empId } : undefined)
+          ]);
+          setLeaveRequests(leaves);
+          setAttendanceRecords(attRecords);
+        } else {
+          const [empList, prList, leaves, attMetrics, cntList, attRecords] = await Promise.all([
+            employeeService.getEmployees(),
+            payrollService.getPayruns(),
+            timeOffService.getTimeOffRequests(),
+            attendanceService.getAttendanceMetrics(),
+            contractService.getContracts(),
+            attendanceService.getAttendanceRecords()
+          ]);
+          setEmployees(empList);
+          setPayruns(prList);
+          setLeaveRequests(leaves);
+          setAttendanceStats(attMetrics);
+          setContracts(cntList);
+          setAttendanceRecords(attRecords);
+        }
       } catch (err) {
         console.error('Failed to load dashboard data', err);
       } finally {
@@ -69,7 +84,7 @@ export const DashboardPage: React.FC = () => {
       }
     }
     loadDashboardData();
-  }, [role, user]);
+  }, [effectiveRole, user]);
 
   const activeEmployees = employees.filter((e) => e.status === 'Active').length;
   const pendingLeaves = leaveRequests.filter((l) => l.status === 'Pending');
@@ -86,8 +101,8 @@ export const DashboardPage: React.FC = () => {
   });
 
   // Dedicated Employee Self-Service Dashboard
-  if (role === 'employee') {
-    const myLeaves = leaveRequests.filter((l) => l.employeeId === user?.employeeId);
+  if (effectiveRole === 'employee') {
+    const myLeaves = leaveRequests.filter((l) => !user?.employeeId || l.employeeId === user.employeeId);
 
     return (
       <div className="space-y-6">
@@ -212,15 +227,17 @@ export const DashboardPage: React.FC = () => {
             {todayFormatted}
           </span>
           <h1 className="text-2xl font-bold text-slate-900 font-heading mt-0.5">
-            Good morning, {user?.name?.split(' ')[0] || 'Administrator'}
+            Good morning, {user?.name || (effectiveRole === 'admin' ? 'Administrator' : effectiveRole === 'hr_manager' ? 'HR Manager' : 'Payroll Manager')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            PeoplePay360 Operations Workspace. Here is today's organizational status.
+            {effectiveRole === 'admin' && 'Enterprise Administration Portal. Full organizational control and governance.'}
+            {effectiveRole === 'hr_manager' && 'Human Resources Operations. Employee directory, absence approvals, and staff attendance.'}
+            {(effectiveRole === 'hr_payroll_manager' || effectiveRole === 'hr_payroll_user') && 'Payroll Operations & Disbursals. Salary calculation batches, structures, and payslips.'}
           </p>
         </div>
 
         <div className="flex items-center flex-wrap gap-2.5">
-          {canAccess(['hr_manager', 'admin']) && (
+          {(effectiveRole === 'hr_manager' || effectiveRole === 'admin') && (
             <Button
               variant="outline"
               size="sm"
@@ -230,7 +247,7 @@ export const DashboardPage: React.FC = () => {
               Directory
             </Button>
           )}
-          {canAccess(['hr_payroll_user', 'hr_payroll_manager', 'admin']) && (
+          {(effectiveRole === 'hr_payroll_manager' || effectiveRole === 'hr_payroll_user' || effectiveRole === 'admin') && (
             <Button
               variant="accent"
               size="sm"
@@ -238,6 +255,16 @@ export const DashboardPage: React.FC = () => {
               rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
             >
               Active Payrun
+            </Button>
+          )}
+          {effectiveRole === 'admin' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/admin/users')}
+              leftIcon={<Building2 className="w-3.5 h-3.5 text-slate-700" />}
+            >
+              System Users
             </Button>
           )}
         </div>

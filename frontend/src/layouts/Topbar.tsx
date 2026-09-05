@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
+import { getDashboardPath } from '../services/authService';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -108,8 +109,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
                   <button
                     key={r.role}
                     onClick={() => {
-                      switchRole(r.role);
+                      const updated = switchRole(r.role);
                       setIsRoleMenuOpen(false);
+                      navigate(getDashboardPath(updated.role));
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${
                       role === r.role
