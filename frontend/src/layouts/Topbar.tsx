@@ -3,49 +3,31 @@ import {
   Menu, 
   Search, 
   ChevronDown, 
-  ShieldCheck, 
-  LogOut, 
-  CheckCircle2
+  LogOut 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { UserRole } from '../types';
-import { getDashboardPath } from '../services/authService';
 
 interface TopbarProps {
   onMenuClick: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
-  const { user, role, logout, switchRole } = useAuth();
+  const { user, role, logout } = useAuth();
   const navigate = useNavigate();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
-
   const profileRef = useRef<HTMLDivElement>(null);
-  const roleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
-      if (roleRef.current && !roleRef.current.contains(event.target as Node)) {
-        setIsRoleMenuOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const rolesList: { role: UserRole; label: string; desc: string }[] = [
-    { role: 'admin', label: 'Administrator', desc: 'Full System Access & Users' },
-    { role: 'hr_manager', label: 'HR Manager', desc: 'Staff, Leave Approval, Attendance' },
-    { role: 'hr_payroll_manager', label: 'Payroll Manager', desc: 'Payruns, Structures, Validation' },
-    { role: 'hr_payroll_user', label: 'Payroll Operator', desc: 'Compute & Review Payruns' },
-    { role: 'employee', label: 'Employee (Rahul)', desc: 'Self-Service, Own Slips & Leaves' },
-  ];
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 sm:px-6 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
@@ -69,59 +51,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuClick }) => {
         </div>
       </div>
 
-      {/* Right: Role Switcher & User Profile */}
+      {/* Right: User Profile */}
       <div className="flex items-center gap-2.5">
-        {/* Evaluator Persona Switcher */}
-        <div className="relative" ref={roleRef}>
-          <button
-            onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-[#8b008b]/30 bg-[#8b008b]/10 text-[#8b008b] hover:bg-[#8b008b]/20 transition-colors"
-            title="Switch evaluation persona"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#8b008b]" />
-            <span className="hidden sm:inline font-semibold">Persona:</span>
-            <span className="capitalize">{role.replace(/_/g, ' ')}</span>
-            <ChevronDown className="w-3 h-3 text-[#8b008b]" />
-          </button>
-
-          {isRoleMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-card border border-slate-200 p-1.5 z-50">
-              <div className="px-3 py-2 border-b border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Select Evaluation Persona
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Test role-based access control & workflows
-                </p>
-              </div>
-              <div className="py-1 space-y-0.5">
-                {rolesList.map((r) => (
-                  <button
-                    key={r.role}
-                    onClick={() => {
-                      const updated = switchRole(r.role);
-                      setIsRoleMenuOpen(false);
-                      navigate(getDashboardPath(updated.role));
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${
-                      role === r.role
-                        ? 'bg-[#8b008b]/15 text-[#8b008b] font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div>
-                      <p className="font-medium">{r.label}</p>
-                      <p className="text-[10px] text-slate-400 font-normal">{r.desc}</p>
-                    </div>
-                    {role === r.role && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#8b008b] shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* User Profile Dropdown */}
         <div className="relative" ref={profileRef}>

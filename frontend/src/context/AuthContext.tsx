@@ -8,9 +8,8 @@ interface AuthContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
-  switchRole: (newRole: UserRole) => User;
   canAccess: (allowedRoles: UserRole[]) => boolean;
   getRoleDashboardUrl: () => string;
 }
@@ -84,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = async (email: string, password: string = 'Password123!'): Promise<User> => {
+  const login = async (email: string, password: string): Promise<User> => {
     setIsLoading(true);
     try {
       const loggedInUser = await authService.login(email, password);
@@ -98,12 +97,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async (): Promise<void> => {
     await authService.logout();
     setUser(null);
-  };
-
-  const switchRole = (newRole: UserRole): User => {
-    const updated = authService.switchRole(newRole);
-    setUser(updated);
-    return updated;
   };
 
   const role: UserRole = user?.role ? normalizeRole(user.role) : 'employee';
@@ -128,7 +121,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         login,
         logout,
-        switchRole,
         canAccess,
         getRoleDashboardUrl
       }}

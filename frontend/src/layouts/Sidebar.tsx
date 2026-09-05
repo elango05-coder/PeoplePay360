@@ -40,7 +40,7 @@ interface NavSection {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { canAccess, role, user, logout, switchRole } = useAuth();
+  const { canAccess, role, user, logout } = useAuth();
   const navigate = useNavigate();
 
   const sections: NavSection[] = [
@@ -222,7 +222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           })}
         </div>
 
-        {/* Bottom Role Footnote & Persona Switcher */}
+        {/* Bottom Role Status & Sign Out */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/40 shrink-0 space-y-2">
           <div className="flex items-center justify-between px-2 py-1 text-xs">
             <div className="flex items-center gap-2">

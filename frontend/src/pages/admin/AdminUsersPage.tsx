@@ -18,7 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 export const AdminUsersPage: React.FC = () => {
-  const { user, switchRole } = useAuth();
+  const { user } = useAuth();
   const { success } = useToast();
 
   const [usersList, setUsersList] = useState<User[]>(MOCK_USERS);

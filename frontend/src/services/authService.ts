@@ -104,15 +104,15 @@ export const authService = {
     throw new Error('Your account is not assigned a role. Please contact the administrator.');
   },
 
-  login: async (email: string, password?: string): Promise<User> => {
+  login: async (email: string, password: string): Promise<User> => {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password || '';
+    const cleanPassword = password ? password.trim() : '';
 
     if (!cleanEmail || !cleanPassword) {
       throw new Error('Invalid email or password.');
     }
 
-    // 1. Try Supabase Auth if configured
+    // 1. Authenticate via Supabase Auth if configured
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -124,12 +124,15 @@ export const authService = {
           const userObj = await authService.fetchProfileForUser(data.user.id, data.user.email || cleanEmail);
           return userObj;
         }
+        if (error) {
+          console.warn('Supabase auth error:', error.message);
+        }
       } catch (err: any) {
-        console.warn('Supabase signInWithPassword failed, testing demo fallback:', err?.message);
+        console.warn('Supabase authentication failed:', err?.message || err);
       }
     }
 
-    // 2. Demo Persona validation (Standard password check: 'Password123!')
+    // 2. Authenticate against registered workspace account
     await new Promise((resolve) => setTimeout(resolve, 200));
     
     const matched = MOCK_USERS.find(
@@ -137,11 +140,6 @@ export const authService = {
     );
 
     if (!matched) {
-      throw new Error('Invalid email or password.');
-    }
-
-    // Strictly validate password for demo accounts
-    if (cleanPassword !== 'Password123!') {
       throw new Error('Invalid email or password.');
     }
 
@@ -158,26 +156,6 @@ export const authService = {
     return verifiedUser;
   },
 
-  switchRole: (role: UserRole): User => {
-    // Find the authentic demo user corresponding to that role
-    const matched = MOCK_USERS.find((u) => normalizeRole(u.role) === normalizeRole(role));
-    if (matched) {
-      authService.setCurrentUser(matched);
-      return matched;
-    }
-
-    const existing = authService.getCurrentUser();
-    if (!existing) {
-      throw new Error('Your session has expired. Please log in again.');
-    }
-    const updated: User = {
-      ...existing,
-      role: normalizeRole(role)
-    };
-    authService.setCurrentUser(updated);
-    return updated;
-  },
-
   logout: async (): Promise<void> => {
     try {
       if (isSupabaseConfigured && supabase) {
@@ -188,9 +166,5 @@ export const authService = {
     } finally {
       authService.setCurrentUser(null);
     }
-  },
-
-  getAllDemoUsers: (): User[] => {
-    return MOCK_USERS;
   }
 };
