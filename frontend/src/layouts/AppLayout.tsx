@@ -13,7 +13,7 @@ export const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50/70 via-slate-50 to-emerald-50/60 flex text-slate-900 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-[#8b008b]/10 via-slate-50 to-[#90ee90]/15 flex text-slate-900 font-sans">
       {/* Sidebar Navigation */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

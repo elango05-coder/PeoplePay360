@@ -228,9 +228,9 @@ export const AttendancePage: React.FC = () => {
       />
 
       {/* Daily Attendance Session Banner */}
-      <div className="bg-gradient-to-r from-violet-950 via-slate-900 to-emerald-950 border border-slate-800 rounded-2xl p-4 sm:p-5 text-white shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-[#8b008b]/80 via-slate-900 to-[#90ee90]/30 border border-slate-800 rounded-2xl p-4 sm:p-5 text-white shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-emerald-400 shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-[#90ee90] shrink-0">
             <Clock className="w-6 h-6" />
           </div>
           <div>
@@ -239,11 +239,11 @@ export const AttendancePage: React.FC = () => {
                 Daily Shift Session &bull; {todayFormatted}
               </span>
               {isShiftCompleted ? (
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+                <span className="text-[10px] bg-[#90ee90]/20 text-[#90ee90] border border-[#90ee90]/40 px-2 py-0.5 rounded-full font-semibold">
                   Shift Completed
                 </span>
               ) : isCheckedInToday ? (
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold animate-pulse">
+                <span className="text-[10px] bg-[#90ee90]/20 text-[#90ee90] border border-[#90ee90]/40 px-2 py-0.5 rounded-full font-semibold animate-pulse">
                   Clocked In &bull; In Progress
                 </span>
               ) : (
@@ -272,8 +272,8 @@ export const AttendancePage: React.FC = () => {
               size="md"
               onClick={handleCheckIn}
               isLoading={isPunching}
-              leftIcon={<LogIn className="w-4 h-4 text-white" />}
-              className="shadow-lg shadow-emerald-900/40 font-semibold"
+              leftIcon={<LogIn className="w-4 h-4 text-slate-950" />}
+              className="shadow-lg shadow-[#90ee90]/20 font-bold"
             >
               Check In Now
             </Button>
@@ -293,8 +293,8 @@ export const AttendancePage: React.FC = () => {
           )}
 
           {isShiftCompleted && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#90ee90]/20 border border-[#90ee90]/40 text-[#90ee90] text-xs font-semibold">
+              <CheckCircle2 className="w-4 h-4 text-[#90ee90]" />
               <span>Shift Finished</span>
             </div>
           )}
@@ -465,7 +465,7 @@ export const AttendancePage: React.FC = () => {
                       </div>
                     </Td>
                     <Td className="text-xs font-mono text-slate-700">
-                      <span className={isToday ? 'font-bold text-violet-700' : ''}>
+                      <span className={isToday ? 'font-bold text-[#8b008b]' : ''}>
                         {r.date} {isToday && '(Today)'}
                       </span>
                     </Td>

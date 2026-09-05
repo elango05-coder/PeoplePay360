@@ -157,12 +157,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Brand Header */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800/80 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#8b008b] to-[#90ee90] flex items-center justify-center text-white font-bold text-sm shadow-md">
               P
             </div>
             <div>
               <span className="font-bold text-sm tracking-tight text-white block leading-none font-heading">
-                PEOPLEPAY<span className="text-emerald-400">360</span>
+                PEOPLEPAY<span className="text-[#90ee90]">360</span>
               </span>
               <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">
                 HR & Payroll System
@@ -201,7 +201,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     className={({ isActive }) =>
                       `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                         isActive
-                          ? 'bg-violet-600/90 text-white font-semibold shadow-xs'
+                          ? 'bg-[#8b008b] text-white font-semibold shadow-xs'
                           : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
                       }`
                     }
@@ -211,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                       <span>{item.label}</span>
                     </div>
                     {item.badge && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-semibold">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#90ee90]/20 text-[#90ee90] font-semibold">
                         {item.badge}
                       </span>
                     )}
@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="p-3 border-t border-slate-800 bg-slate-950/40 shrink-0 space-y-2">
           <div className="flex items-center justify-between px-2 py-1 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[#90ee90] animate-pulse" />
               <span className="text-[11px] text-slate-300 capitalize font-medium">
                 {role.replace(/_/g, ' ')}
               </span>

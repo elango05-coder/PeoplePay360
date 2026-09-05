@@ -75,7 +75,7 @@ export const LoginPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-violet-600 to-emerald-500 flex items-center justify-center text-white shadow-lg animate-pulse">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#8b008b] to-[#90ee90] flex items-center justify-center text-white shadow-lg animate-pulse">
             <span className="font-bold text-xl">P</span>
           </div>
           <p className="text-sm font-semibold text-slate-300 tracking-wide">
@@ -87,13 +87,13 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-950 via-slate-900 to-emerald-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#8b008b]/90 via-slate-950 to-[#90ee90]/30 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-tr from-violet-600 to-emerald-500 text-white font-bold text-xl shadow-lg mb-3">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-tr from-[#8b008b] to-[#90ee90] text-white font-bold text-xl shadow-lg mb-3">
           P
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-heading">
-          PeoplePay<span className="text-emerald-400">360</span>
+          PeoplePay<span className="text-[#90ee90]">360</span>
         </h2>
         <p className="mt-1 text-xs sm:text-sm text-slate-300">
           Enterprise Human Resources & Payroll Operations Platform

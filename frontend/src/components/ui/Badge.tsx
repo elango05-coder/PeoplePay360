@@ -45,23 +45,23 @@ export const Badge: React.FC<BadgeProps> = ({
   }
 
   const variantStyles: Record<BadgeVariant, string> = {
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+    success: 'bg-[#90ee90]/25 text-[#14532d] border-[#90ee90]/60 font-semibold',
     warning: 'bg-amber-50 text-amber-700 border-amber-200/80',
     danger: 'bg-rose-50 text-rose-700 border-rose-200/80',
     info: 'bg-blue-50 text-blue-700 border-blue-200/80',
     neutral: 'bg-slate-100 text-slate-700 border-slate-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200/80',
-    violet: 'bg-violet-50 text-violet-700 border-violet-200/80'
+    purple: 'bg-[#8b008b]/15 text-[#8b008b] border-[#8b008b]/40 font-semibold',
+    violet: 'bg-[#8b008b]/15 text-[#8b008b] border-[#8b008b]/40 font-semibold'
   };
 
   const dotColors: Record<BadgeVariant, string> = {
-    success: 'bg-emerald-500',
+    success: 'bg-[#90ee90]',
     warning: 'bg-amber-500',
     danger: 'bg-rose-500',
     info: 'bg-blue-500',
     neutral: 'bg-slate-400',
-    purple: 'bg-purple-500',
-    violet: 'bg-violet-600'
+    purple: 'bg-[#8b008b]',
+    violet: 'bg-[#8b008b]'
   };
 
   const sizeStyles = {
