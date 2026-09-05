@@ -3,7 +3,8 @@
 // ==============================================================================
 
 import 'dotenv/config';
-import { supabase } from '../src/lib/supabase.js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { supabaseUrl, supabaseKey } from '../src/lib/supabase.js';
 
 interface CheckItem {
   name: string;
@@ -27,33 +28,63 @@ async function check(name: string, fn: () => Promise<any>) {
 
 async function run() {
   console.log('--- Starting Real Supabase Integration Verification ---');
-  console.log(`Project URL: ${process.env.VITE_SUPABASE_URL || 'Not configured'}`);
+  console.log(`Project URL: ${supabaseUrl}`);
 
-  // 1. Check Tables & Seed Data
+  // Step A: Create authenticated client as Admin
+  let client: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: authData, error: authError } = await client.auth.signInWithPassword({
+    email: 'admin@peoplepay360.com',
+    password: 'Password123!',
+  });
+
+  if (authData?.session) {
+    console.log('Successfully authenticated as admin@peoplepay360.com!');
+  } else {
+    console.log(`Note: Running as unauthenticated/anon client (${authError?.message || 'not logged in'}). Some tables may be protected by RLS.`);
+  }
+
+  // 1. Check RPC: get_dashboard_metrics
+  await check('Check RPC: get_dashboard_metrics', async () => {
+    const { data, error } = await client.rpc('get_dashboard_metrics');
+    if (error) throw error;
+    if (!data || typeof data.total_employees !== 'number') {
+      throw new Error('Dashboard metrics RPC returned invalid schema');
+    }
+    return `Dashboard metrics: Total Emp=${data.total_employees}, Active=${data.active_employees}`;
+  });
+
+  // 2. Check Departments Table
   await check('Check Departments Table', async () => {
-    const { data, error } = await supabase.from('departments').select('*');
+    const { data, error } = await client.from('departments').select('*');
     if (error) throw error;
     if (!data || data.length < 3) throw new Error(`Expected at least 3 departments, got ${data?.length}`);
     return `${data.length} departments found`;
   });
 
+  // 3. Check Employees Table & Rahul (EMP001)
   await check('Check Employees Table & Rahul (EMP001)', async () => {
-    const { data, error } = await supabase.from('employees').select('*').eq('employee_code', 'EMP001').single();
+    const { data, error } = await client.from('employees').select('*').eq('employee_code', 'EMP001').single();
     if (error) throw error;
     if (!data) throw new Error('Rahul Sharma (EMP001) not found');
     return `Employee EMP001 found: ${data.first_name} ${data.last_name}`;
   });
 
+  // 4. Check Priya Patel (EMP002)
   await check('Check Priya Patel (EMP002)', async () => {
-    const { data, error } = await supabase.from('employees').select('*').eq('employee_code', 'EMP002').single();
+    const { data, error } = await client.from('employees').select('*').eq('employee_code', 'EMP002').single();
     if (error) throw error;
     return `Employee EMP002 found: ${data.first_name} ${data.last_name}`;
   });
 
-  // 2. Check Historical Contracts for Rahul
+  // 5. Check Historical Contracts for Rahul (Jan-Jun vs Jul-Dec)
   await check('Check Rahul Historical Contracts (Contract 1 & Contract 2)', async () => {
-    const { data: rahul } = await supabase.from('employees').select('id').eq('employee_code', 'EMP001').single();
-    const { data: contracts, error } = await supabase
+    const { data: rahul } = await client.from('employees').select('id').eq('employee_code', 'EMP001').single();
+    if (!rahul) throw new Error('Rahul not found');
+
+    const { data: contracts, error } = await client
       .from('contracts')
       .select('*')
       .eq('employee_id', rahul.id)
@@ -69,12 +100,13 @@ async function run() {
     return `Contracts verified: Jan-Jun = ₹${c1.wage}, Jul-Dec = ₹${c2.wage}`;
   });
 
-  // 3. Check RPC: get_applicable_contract
+  // 6. Check RPC: get_applicable_contract (June vs July)
   await check('Check RPC: get_applicable_contract (June vs July)', async () => {
-    const { data: rahul } = await supabase.from('employees').select('id').eq('employee_code', 'EMP001').single();
+    const { data: rahul } = await client.from('employees').select('id').eq('employee_code', 'EMP001').single();
+    if (!rahul) throw new Error('Rahul not found');
 
     // June Period
-    const { data: juneContract, error: errJune } = await supabase.rpc('get_applicable_contract', {
+    const { data: juneContract, error: errJune } = await client.rpc('get_applicable_contract', {
       p_employee_id: rahul.id,
       p_period_start: '2025-06-01',
       p_period_end: '2025-06-30',
@@ -85,7 +117,7 @@ async function run() {
     }
 
     // July Period
-    const { data: julyContract, error: errJuly } = await supabase.rpc('get_applicable_contract', {
+    const { data: julyContract, error: errJuly } = await client.rpc('get_applicable_contract', {
       p_employee_id: rahul.id,
       p_period_start: '2025-07-01',
       p_period_end: '2025-07-31',
@@ -98,28 +130,18 @@ async function run() {
     return `RPC get_applicable_contract verified! June => ₹${juneContract[0].wage}, July => ₹${julyContract[0].wage}`;
   });
 
-  // 4. Check RPC: get_dashboard_metrics
-  await check('Check RPC: get_dashboard_metrics', async () => {
-    const { data, error } = await supabase.rpc('get_dashboard_metrics');
-    if (error) throw error;
-    if (!data || typeof data.total_employees !== 'number') {
-      throw new Error('Dashboard metrics RPC returned invalid schema');
-    }
-    return `Dashboard metrics: Total Emp=${data.total_employees}, Active=${data.active_employees}`;
-  });
-
-  // 5. Check Payrun Lifecycle RPCs (Compute -> Validate)
+  // 7. Check Payrun Lifecycle RPCs (Compute -> Validate)
   await check('Check Payruns and Employee Payroll Calculation', async () => {
-    const { data: payruns, error } = await supabase.from('payruns').select('*').limit(1);
+    const { data: payruns, error } = await client.from('payruns').select('*').limit(1);
     if (error) throw error;
     if (!payruns || payruns.length === 0) throw new Error('No payruns found');
 
     const payrunId = payruns[0].id;
-    const { data: computeRes, error: compErr } = await supabase.rpc('compute_payrun', { p_payrun_id: payrunId });
+    const { data: computeRes, error: compErr } = await client.rpc('compute_payrun', { p_payrun_id: payrunId });
     if (compErr) throw compErr;
     if (!computeRes?.success) throw new Error(`compute_payrun failed: ${JSON.stringify(computeRes)}`);
 
-    const { data: validateRes, error: valErr } = await supabase.rpc('validate_payrun', { p_payrun_id: payrunId });
+    const { data: validateRes, error: valErr } = await client.rpc('validate_payrun', { p_payrun_id: payrunId });
     if (valErr) throw valErr;
 
     return `Payrun computed & validation evaluated: ${JSON.stringify(validateRes)}`;
