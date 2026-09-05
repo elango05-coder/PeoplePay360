@@ -31,7 +31,7 @@ export const Badge: React.FC<BadgeProps> = ({
     const s = status.toLowerCase();
     if (['active', 'present', 'approved', 'paid'].includes(s)) {
       computedVariant = 'success';
-    } else if (['pending', 'late', 'draft', 'on leave'].includes(s)) {
+    } else if (['pending', 'late', 'draft', 'on leave', 'half day'].includes(s)) {
       computedVariant = 'warning';
     } else if (['absent', 'rejected', 'terminated', 'missing checkout'].includes(s)) {
       computedVariant = 'danger';

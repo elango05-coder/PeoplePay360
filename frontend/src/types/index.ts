@@ -65,7 +65,8 @@ export type AttendanceStatus =
   | 'Absent' 
   | 'Overtime' 
   | 'Missing Checkout' 
-  | 'Corrected';
+  | 'Corrected'
+  | 'Half Day';
 
 export interface AttendanceRecord {
   id: string;

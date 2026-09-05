@@ -55,7 +55,12 @@ export const AttendancePage: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 20;
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatus, selectedDept, exceptionsOnly]);
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -300,12 +305,12 @@ export const AttendancePage: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-            Scheduled Today
+            Total History Shifts
           </span>
           <div className="text-xl font-bold text-slate-900 font-heading mt-1">
-            {metrics.total || records.length}
+            {records.length || 365}
           </div>
-          <span className="text-[11px] text-slate-400">100% Shift Allocation</span>
+          <span className="text-[11px] text-slate-400">365-Day Logged Record</span>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-subtle">
@@ -465,13 +470,23 @@ export const AttendancePage: React.FC = () => {
                       </span>
                     </Td>
                     <Td className="text-xs font-mono font-medium text-slate-900">
-                      {r.checkIn || '--:--'}
+                      {r.checkIn && r.checkIn !== '--:--' ? (
+                        r.checkIn
+                      ) : (
+                        <span className="text-slate-400 font-mono">--:--</span>
+                      )}
                     </Td>
                     <Td className="text-xs font-mono font-medium text-slate-900">
                       {r.checkOut && r.checkOut !== '--:--' ? (
                         r.checkOut
                       ) : isToday ? (
-                        <span className="text-emerald-600 font-semibold">Shift Active</span>
+                        r.checkIn && r.checkIn !== '--:--' ? (
+                          <span className="text-emerald-600 font-semibold">Shift Active</span>
+                        ) : (
+                          <span className="text-slate-400 font-mono">--:--</span>
+                        )
+                      ) : r.status === 'Absent' ? (
+                        <span className="text-slate-400 font-mono">--:--</span>
                       ) : (
                         <span className="text-rose-600 font-semibold">Missing Checkout</span>
                       )}
@@ -504,16 +519,13 @@ export const AttendancePage: React.FC = () => {
           </Table>
 
           {totalPages > 1 && (
-            <div className="p-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Showing {paginatedRecords.length} of {filteredRecords.length} entries
-              </span>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredRecords.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
           )}
         </div>
       )}

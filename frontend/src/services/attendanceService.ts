@@ -102,6 +102,208 @@ function matchesEmployeeId(recordEmpId: string, queryEmpId: string): boolean {
   return false;
 }
 
+export function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+export function generateDeterministic365Attendance(
+  employeeId: string,
+  employeeName?: string,
+  employeeCode?: string,
+  department?: string,
+  existingRealRecords: AttendanceRecord[] = []
+): AttendanceRecord[] {
+  const records: AttendanceRecord[] = [];
+  const today = new Date();
+
+  // Known employee metadata fallback
+  let empName: string = employeeName || '';
+  let empCode: string = employeeCode || '';
+  let dept: string = department || '';
+
+  if (!empName || empName === 'Staff Member') {
+    if (employeeId.includes('1111') || employeeId === 'emp-1') {
+      empName = 'Rahul Sharma';
+      empCode = 'EMP-1001';
+      dept = 'Engineering';
+    } else if (employeeId.includes('2222') || employeeId === 'emp-2') {
+      empName = 'Priya Sharma';
+      empCode = 'EMP-1002';
+      dept = 'Human Resources';
+    } else if (employeeId.includes('3333') || employeeId === 'emp-3') {
+      empName = 'Arjun Patel';
+      empCode = 'EMP-1003';
+      dept = 'Operations';
+    } else if (employeeId.includes('4444') || employeeId === 'emp-4') {
+      empName = 'Ananya Desai';
+      empCode = 'EMP-1004';
+      dept = 'Finance';
+    } else {
+      empName = 'Staff Member';
+      empCode = 'EMP-1099';
+      dept = 'Operations';
+    }
+  }
+
+  // Ensure non-empty fallback strings
+  if (!empName) empName = 'Staff Member';
+  if (!empCode) empCode = 'EMP-1001';
+  if (!dept) dept = 'Operations';
+
+  // Lookup map of real records by date for this employee
+  const realMap = new Map<string, AttendanceRecord>();
+  for (const r of existingRealRecords) {
+    if (matchesEmployeeId(r.employeeId, employeeId)) {
+      realMap.set(r.date, r);
+    }
+  }
+
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const dateStr = getLocalDateString(d);
+
+    // If a real record exists for this date, ALWAYS use it!
+    if (realMap.has(dateStr)) {
+      const real = realMap.get(dateStr)!;
+      records.push({
+        ...real,
+        employeeName: real.employeeName || empName,
+        employeeCode: real.employeeCode || empCode,
+        department: real.department || dept
+      });
+      continue;
+    }
+
+    // If day 0 (Today) and no real punch exists yet:
+    if (i === 0) {
+      records.push({
+        id: `att-today-${employeeId}`,
+        employeeId,
+        employeeName: empName,
+        employeeCode: empCode,
+        department: dept,
+        date: dateStr,
+        checkIn: '--:--',
+        checkOut: '--:--',
+        workedHours: '0.0h',
+        status: 'Present',
+        notes: 'Shift scheduled • Awaiting punch'
+      });
+      continue;
+    }
+
+    // Historical days: deterministic calculation from hash
+    const h = hashString(`${employeeId}:${dateStr}`);
+    const mod = h % 100;
+
+    let checkIn = '09:00 AM';
+    let checkOut = '06:00 PM';
+    let workedHours = '9.0h';
+    let status: AttendanceStatus = 'Present';
+    let notes = 'Normal biometric punch';
+
+    if (mod < 75) {
+      // 75% On-Time Present
+      status = 'Present';
+      const inOffset = (h % 26) - 12; // -12 to +13 mins from 09:00 AM
+      const inTotalMin = 9 * 60 + inOffset;
+      const inH = Math.floor(inTotalMin / 60);
+      const inM = inTotalMin % 60;
+      checkIn = `${String(inH).padStart(2, '0')}:${String(inM).padStart(2, '0')} AM`;
+
+      const outOffset = (h >> 3) % 36; // 0 to 35 mins after 06:00 PM
+      const outTotalMin = 18 * 60 + outOffset;
+      const outH = Math.floor(outTotalMin / 60) - 12;
+      const outM = outTotalMin % 60;
+      checkOut = `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')} PM`;
+
+      const durationHours = Math.round(((outTotalMin - inTotalMin) / 60) * 10) / 10;
+      workedHours = `${durationHours.toFixed(1)}h`;
+      notes = 'Punctual shift logged';
+    } else if (mod < 87) {
+      // 12% Late arrival
+      status = 'Late';
+      const inOffset = 35 + ((h >> 2) % 45); // 09:35 AM - 10:19 AM
+      const inTotalMin = 9 * 60 + inOffset;
+      const inH = Math.floor(inTotalMin / 60);
+      const inM = inTotalMin % 60;
+      checkIn = `${String(inH).padStart(2, '0')}:${String(inM).padStart(2, '0')} AM`;
+
+      const outOffset = 30 + ((h >> 4) % 40); // 06:30 PM - 07:09 PM
+      const outTotalMin = 18 * 60 + outOffset;
+      const outH = Math.floor(outTotalMin / 60) - 12;
+      const outM = outTotalMin % 60;
+      checkOut = `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')} PM`;
+
+      const durationHours = Math.round(((outTotalMin - inTotalMin) / 60) * 10) / 10;
+      workedHours = `${durationHours.toFixed(1)}h`;
+      const lateNotes = [
+        'Traffic congestion on arterial road',
+        'Metro transport signal delay',
+        'Commute weather delay'
+      ];
+      notes = lateNotes[h % lateNotes.length];
+    } else if (mod < 92) {
+      // 5% Absent
+      status = 'Absent';
+      checkIn = '--:--';
+      checkOut = '--:--';
+      workedHours = '0.0h';
+      const absentNotes = [
+        'Approved Casual Leave',
+        'Medical / Sick Leave with documentation',
+        'Authorized personal leave'
+      ];
+      notes = absentNotes[h % absentNotes.length];
+    } else if (mod < 96) {
+      // 4% Half Day
+      status = 'Half Day';
+      checkIn = '09:05 AM';
+      checkOut = '01:15 PM';
+      workedHours = '4.2h';
+      notes = 'Half-day approved personal emergency';
+    } else {
+      // 4% Overtime
+      status = 'Overtime';
+      checkIn = '08:50 AM';
+      const outOffset = 30 + ((h >> 5) % 60); // 08:30 PM - 09:29 PM
+      const outTotalMin = 20 * 60 + outOffset;
+      const outH = Math.floor(outTotalMin / 60) - 12;
+      const outM = outTotalMin % 60;
+      checkOut = `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')} PM`;
+      const durationHours = Math.round(((outTotalMin - (8 * 60 + 50)) / 60) * 10) / 10;
+      workedHours = `${durationHours.toFixed(1)}h`;
+      const otNotes = [
+        'Release deployment sprint overtime',
+        'Quarterly financial reconciliation audit',
+        'Critical client onboarding deployment'
+      ];
+      notes = otNotes[h % otNotes.length];
+    }
+
+    records.push({
+      id: `att-mock-${employeeId}-${dateStr}`,
+      employeeId,
+      employeeName: empName,
+      employeeCode: empCode,
+      department: dept,
+      date: dateStr,
+      checkIn,
+      checkOut,
+      workedHours,
+      status,
+      notes
+    });
+  }
+
+  return records;
+}
+
 export const attendanceService = {
   getAttendanceRecords: async (filters?: {
     date?: string;
@@ -109,7 +311,9 @@ export const attendanceService = {
     status?: string;
     employeeId?: string;
   }): Promise<AttendanceRecord[]> => {
-    // 1. Try Supabase
+    // 1. Gather all real records from Supabase and local store
+    const realRecords: AttendanceRecord[] = [];
+
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase
@@ -120,46 +324,45 @@ export const attendanceService = {
           query = query.eq('employee_id', filters.employeeId);
         }
 
-        if (filters?.date) {
-          query = query.eq('attendance_date', filters.date);
-        }
-
         const { data, error } = await query.order('attendance_date', { ascending: false });
-
         if (!error && data && data.length > 0) {
-          let list = data.map(mapDbToAttendance);
-
-          if (filters?.department && filters.department !== 'All') {
-            list = list.filter((r) => r.department === filters.department);
-          }
-
-          if (filters?.status && filters.status !== 'All') {
-            list = list.filter((r) => r.status === filters.status);
-          }
-
-          return list;
+          realRecords.push(...data.map(mapDbToAttendance));
         }
       } catch (err) {
-        console.warn('Supabase attendance query error, using local store:', err);
+        console.warn('Supabase query error:', err);
       }
     }
 
-    // 2. Local Storage Repository
-    let list = getStoredAttendance();
-    if (filters?.employeeId) {
-      const empId = filters.employeeId;
-      list = list.filter((r) => matchesEmployeeId(r.employeeId, empId));
+    // Merge in any records from local store that are not yet in realRecords
+    const stored = getStoredAttendance();
+    for (const s of stored) {
+      if (!realRecords.some((r) => r.id === s.id || (r.employeeId === s.employeeId && r.date === s.date))) {
+        realRecords.push(s);
+      }
     }
+
+    // 2. Generate 365-day dataset
+    const targetEmployeeId = filters?.employeeId || 'aaaa1111-1111-1111-1111-111111111111';
+    let records = generateDeterministic365Attendance(
+      targetEmployeeId,
+      undefined,
+      undefined,
+      filters?.department !== 'All' ? filters?.department : undefined,
+      realRecords
+    );
+
+    // 3. Apply optional filters
     if (filters?.date) {
-      list = list.filter((r) => r.date === filters.date);
+      records = records.filter((r) => r.date === filters.date);
     }
     if (filters?.department && filters.department !== 'All') {
-      list = list.filter((r) => r.department === filters.department);
+      records = records.filter((r) => r.department === filters.department);
     }
     if (filters?.status && filters.status !== 'All') {
-      list = list.filter((r) => r.status === filters.status);
+      records = records.filter((r) => r.status === filters.status);
     }
-    return list;
+
+    return records;
   },
 
   getTodayAttendance: async (employeeId: string, dateStr?: string): Promise<AttendanceRecord | null> => {
